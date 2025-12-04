@@ -1,0 +1,18 @@
+body {
+  font-family: Arial, sans-serif;
+  text-align: center;
+  margin: 20px;
+}
+
+video {
+  border: 2px solid #000;
+  width: 320px;
+  height: 240px;
+}
+
+img {
+  margin-top: 10px;
+  border: 2px solid #666;
+  width: 320px;
+  height: 240px;
+}

@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Virtual Try-On Result - Holord</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: #f8fafc;
+            font-family: "Inter", sans-serif;
+            min-height: 100vh;
+        }
+        
+        .result-image {
+            max-width: 100%;
+            height: auto;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+        
+        .loading-spinner {
+            border: 4px solid #f3f4f6;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <div class="flex items-center justify-center mb-4">
+                <div class="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-lg mr-3">
+                    <span class="text-blue-600 font-bold text-2xl">H</span>
+                </div>
+                <h1 class="text-3xl font-bold text-gray-800">Holord</h1>
+            </div>
+            <p class="text-gray-600">Your Virtual Try-On Result</p>
+        </div>
+
+        <!-- Main Content -->
+        <div class="max-w-4xl mx-auto">
+            <!-- Result Image -->
+            <div class="bg-white rounded-2xl shadow-xl p-6 mb-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">Your Virtual Try-On</h2>
+                <div class="flex justify-center">
+                    <img id="resultImage" src="" alt="Virtual Try-On Result" class="result-image hidden">
+                    <div id="loadingSpinner" class="loading-spinner"></div>
+                </div>
+                <p id="imageInfo" class="text-center text-gray-600 mt-4 text-sm"></p>
+            </div>
+
+            <!-- Outfit Details -->
+            <div id="outfitDetails" class="bg-white rounded-2xl shadow-xl p-6 mb-6 hidden">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">Outfit Details</h3>
+                <div id="selectedOutfitsList" class="space-y-2"></div>
+                <div id="footwearInfo" class="mt-4 p-3 bg-green-50 rounded-lg"></div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                <button id="saveButton" class="bg-green-600 text-white py-4 px-6 rounded-xl font-semibold hover:bg-green-700 transition-colors flex items-center justify-center">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
+                    </svg>
+                    Save Image
+                </button>
+                
+                <button id="shareButton" class="bg-blue-600 text-white py-4 px-6 rounded-xl font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+                    </svg>
+                    Share
+                </button>
+                
+                <button id="tryAgainButton" class="bg-purple-600 text-white py-4 px-6 rounded-xl font-semibold hover:bg-purple-700 transition-colors flex items-center justify-center">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    Try Another
+                </button>
+            </div>
+
+            <!-- QR Code Section -->
+            <div id="qrCodeSection" class="bg-white rounded-2xl shadow-xl p-6 text-center hidden">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">Share Your Look</h3>
+                <img id="qrCodeImage" src="" alt="QR Code" class="mx-auto w-48 h-48 mb-4">
+                <p class="text-gray-600">Scan to view your virtual try-on</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Get result data from URL parameters or localStorage
+        function getResultData() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const resultImageUrl = urlParams.get('image') || localStorage.getItem('lastTryOnResult');
+            const outfitsData = localStorage.getItem('lastSelectedOutfits');
+            const footwearData = localStorage.getItem('lastFootwearInfo');
+            const qrCodeUrl = localStorage.getItem('lastQRCode');
+            
+            return {
+                resultImageUrl,
+                outfits: outfitsData ? JSON.parse(outfitsData) : [],
+                footwear: footwearData ? JSON.parse(footwearData) : null,
+                qrCodeUrl
+            };
+        }
+
+        // Display the result
+        function displayResult() {
+            const { resultImageUrl, outfits, footwear, qrCodeUrl } = getResultData();
+            const resultImage = document.getElementById('resultImage');
+            const loadingSpinner = document.getElementById('loadingSpinner');
+            const imageInfo = document.getElementById('imageInfo');
+            const outfitDetails = document.getElementById('outfitDetails');
+            const selectedOutfitsList = document.getElementById('selectedOutfitsList');
+            const footwearInfo = document.getElementById('footwearInfo');
+            const qrCodeSection = document.getElementById('qrCodeSection');
+            const qrCodeImage = document.getElementById('qrCodeImage');
+
+            if (resultImageUrl) {
+                resultImage.onload = function() {
+                    loadingSpinner.style.display = 'none';
+                    resultImage.classList.remove('hidden');
+                    imageInfo.textContent = 'Your virtual try-on is ready!';
+                };
+                
+                resultImage.onerror = function() {
+                    loadingSpinner.style.display = 'none';
+                    imageInfo.textContent = 'Failed to load result image. Please try again.';
+                    imageInfo.className = 'text-center text-red-600 mt-4 text-sm';
+                };
+                
+                resultImage.src = resultImageUrl;
+                
+                // Display outfit details
+                if (outfits && outfits.length > 0) {
+                    outfitDetails.classList.remove('hidden');
+                    selectedOutfitsList.innerHTML = outfits.map(outfit => 
+                        `<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <span class="font-medium text-gray-800">${outfit.name}</span>
+                            <span class="text-sm text-gray-600 bg-white px-2 py-1 rounded">${outfit.type}</span>
+                        </div>`
+                    ).join('');
+                }
+                
+                // Display footwear info
+                if (footwear) {
+                    footwearInfo.innerHTML = `
+                        <div class="flex items-center">
+                            <span class="text-lg mr-2">${footwear.display.split(' ')[0]}</span>
+                            <span class="font-medium text-green-700">${footwear.display}</span>
+                        </div>
+                    `;
+                }
+                
+                // Display QR code if available
+                if (qrCodeUrl) {
+                    qrCodeSection.classList.remove('hidden');
+                    qrCodeImage.src = qrCodeUrl;
+                }
+            } else {
+                loadingSpinner.style.display = 'none';
+                imageInfo.textContent = 'No result found. Please go back and generate a virtual try-on first.';
+                imageInfo.className = 'text-center text-red-600 mt-4 text-sm';
+            }
+        }
+
+        // Setup event listeners
+        function setupEventListeners() {
+            document.getElementById('saveButton').addEventListener('click', function() {
+                const resultImage = document.getElementById('resultImage');
+                if (resultImage.src) {
+                    const link = document.createElement('a');
+                    link.href = resultImage.src;
+                    link.download = `virtual-tryon-${Date.now()}.jpg`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    
+                    // Show confirmation
+                    const originalText = this.innerHTML;
+                    this.innerHTML = '✓ Saved!';
+                    this.disabled = true;
+                    setTimeout(() => {
+                        this.innerHTML = originalText;
+                        this.disabled = false;
+                    }, 2000);
+                }
+            });
+            
+            document.getElementById('shareButton').addEventListener('click', async function() {
+                const resultImage = document.getElementById('resultImage');
+                if (resultImage.src && navigator.share) {
+                    try {
+                        const response = await fetch(resultImage.src);
+                        const blob = await response.blob();
+                        const file = new File([blob], 'virtual-tryon.jpg', { type: 'image/jpeg' });
+                        
+                        await navigator.share({
+                            files: [file],
+                            title: 'My Virtual Try-On',
+                            text: 'Check out my virtual try-on result!'
+                        });
+                    } catch (error) {
+                        console.log('Sharing cancelled or not supported');
+                    }
+                } else {
+                    // Fallback to save
+                    document.getElementById('saveButton').click();
+                }
+            });
+            
+            document.getElementById('tryAgainButton').addEventListener('click', function() {
+                window.location.href = 'outfit.html';
+            });
+        }
+
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', function() {
+            displayResult();
+            setupEventListeners();
+        });
+    </script>
+</body>
+</html>

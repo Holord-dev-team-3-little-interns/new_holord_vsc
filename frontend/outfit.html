@@ -1,0 +1,2138 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Virtual Try-On - Holord</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        height: 100vh;
+        overflow: hidden;
+        font-family: "Inter", sans-serif;
+        background: gray;
+    }
+
+    .photo-background {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: 1;
+    }
+
+    .photo-background img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .floating-ui {
+        position: fixed;
+        z-index: 10;
+        pointer-events: none;
+    }
+
+    .floating-ui > * {
+        pointer-events: auto;
+    }
+
+.outfit-panel {
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(20px);
+    border-radius: 20px;
+    box-shadow: -5px 0 25px rgba(0, 0, 0, 0.15);
+    padding: 1.25rem;
+    overflow-y: auto;
+    width: 400px;
+    border-left: 1px solid rgba(255, 255, 255, 0.3);
+    max-height: 50vh; /* Changed from 85vh to 50vh (midpoint) */
+    margin-top: 2rem;
+}
+
+.outfit-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.4rem; /* Reduced from 0.5rem */
+    margin-top: 0.5rem;
+    overflow-y: auto;
+}
+
+.outfit-card {
+    transition: all 0.3s ease;
+    border-radius: 8px; /* Reduced from 10px */
+    overflow: hidden;
+    cursor: pointer;
+    border: 2px solid transparent;
+    background: white;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08); /* Reduced shadow */
+    aspect-ratio: 3/4;
+    position: relative;
+    width: 100%;
+}
+
+    .outfit-card:hover {
+        transform: scale(1.03);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+        border-color: #3b82f6;
+    }
+
+    .outfit-card.selected {
+        
+        transform: scale(1.05);
+        border-color: #2563eb;
+        box-shadow: 0 10px 25px rgba(37, 99, 235, 0.2);
+    }
+
+    .outfit-card.multi-selected {
+        border-color: #10b981;
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.3);
+    }
+
+.outfit-image {
+    width: 100%;
+    height: 100px; /* Reduced from 120px */
+    object-fit: cover;
+    background: #f8fafc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6b7280;
+    font-size: 0.65rem; /* Smaller text */
+    text-align: center;
+}
+.outfit-name {
+    padding: 0.4rem; /* Reduced from 0.5rem */
+    text-align: center;
+    font-weight: 600;
+    color: #1f2937;
+    font-size: 0.75rem; /* Smaller font */
+}
+
+    .pulse {
+        animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.7; }
+        100% { opacity: 1; }
+    }
+
+    .category-tabs {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .category-tab {
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        border: 1px solid #d1d5db;
+        background: white;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+
+    .category-tab.active {
+        background: #3b82f6;
+        color: white;
+        border-color: #3b82f6;
+    }
+
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 100;
+        color: white;
+    }
+
+    .spinner {
+        border: 4px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top: 4px solid white;
+        width: 50px;
+        height: 50px;
+        animation: spin 1s linear infinite;
+        margin-bottom: 1rem;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .result-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 100;
+    }
+
+    .modal-content {
+        background: white;
+        border-radius: 20px;
+        padding: 2rem;
+        max-width: 95vw;
+        max-height: 95vh;
+        overflow-y: auto;
+    }
+
+    .selection-animation {
+        animation: selectPulse 0.5s ease;
+    }
+
+    @keyframes selectPulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
+    }
+
+    .upload-area {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: white;
+        padding: 2rem;
+        border-radius: 20px;
+        text-align: center;
+        z-index: 20;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    .try-on-effect {
+        filter: contrast(1.1) saturate(1.1);
+        transition: all 0.3s ease;
+    }
+
+    .result-label {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 5px 10px;
+        border-radius: 5px;
+        font-size: 0.8rem;
+        z-index: 2;
+    }
+
+    .result-comparison {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .debug-info {
+        background: #f3f4f6;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-top: 1rem;
+        font-family: monospace;
+        font-size: 0.8rem;
+    }
+
+    .placeholder-text {
+        padding: 20px;
+        text-align: center;
+        color: #6b7280;
+        font-size: 0.9rem;
+    }
+
+    .qr-code {
+        margin-top: 1rem;
+        text-align: center;
+    }
+
+    .webcam-container {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: white;
+        padding: 2rem;
+        border-radius: 20px;
+        text-align: center;
+        z-index: 25;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    #webcamVideo {
+        width: 100%;
+        max-width: 500px;
+        border-radius: 10px;
+        margin-bottom: 1rem;
+    }
+
+    .capture-btn {
+        background: #10b981;
+        color: white;
+        padding: 10px 20px;
+        border-radius: 50px;
+        border: none;
+        cursor: pointer;
+        font-weight: 600;
+        margin: 0 5px;
+    }
+
+    .retake-btn {
+        background: #ef4444;
+        color: white;
+        padding: 10px 20px;
+        border-radius: 50px;
+        border: none;
+        cursor: pointer;
+        font-weight: 600;
+        margin: 0 5px;
+    }
+
+    .captured-image {
+        max-width: 100%;
+        border-radius: 10px;
+        margin-bottom: 1rem;
+    }
+
+    /* Fixed image sizing for result modal - 9:16 aspect ratio */
+    .image-container {
+        width: 100%;
+        aspect-ratio: 9/16;
+        overflow: hidden;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        background: #000;
+        position: relative;
+    }
+
+    .image-container img {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center center;
+    }
+
+    /* Force both images to be exactly the same size */
+    #originalPhotoPreview,
+    #generatedImage {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover !important;
+        object-position: center center !important;
+    }
+
+    .modal-content .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+        align-items: start;
+    }
+
+    /* Ensure the try-on effect border doesn't affect sizing */
+    .try-on-effect {
+        border: 4px solid #3b82f6 !important;
+        box-sizing: border-box;
+    }
+
+    .selection-badge {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        background: #10b981;
+        color: white;
+        border-radius: 50%;
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: bold;
+        z-index: 10;
+    }
+
+    .selected-outfits-display {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        border-left: 4px solid #3b82f6;
+    }
+
+    .selected-item {
+        display: inline-block;
+        background: #e5e7eb;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        margin: 0.25rem;
+        font-size: 0.875rem;
+    }
+
+    /* Fullscreen Image Styles - UPDATED TO FILL SPACE */
+    .image-container-fullscreen {
+        width: 100%;
+        max-width: 100vw;
+        height: 70vh;
+        background: #000000;
+        border-radius: 12px;
+        overflow: hidden;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    .generated-image-fullscreen {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+
+    /* Compact 3-Step Process Styles - Made more compact */
+    .steps-container {
+        background: linear-gradient(135deg, #eff6ff 0%, #faf5ff 100%);
+        border-radius: 8px; /* Smaller */
+        padding: 0.6rem; /* Reduced from 0.75rem */
+        border: 1px solid #e0e7ff;
+        margin-bottom: 0.6rem; /* Reduced from 0.75rem */
+    }
+    
+    .steps-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem; /* Reduced from 0.75rem */
+    }
+
+    .step-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.6rem; /* Reduced from 0.75rem */
+    }
+
+    .step-number {
+        width: 20px; /* Smaller */
+        height: 20px; /* Smaller */
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 0.65rem; /* Smaller */
+        flex-shrink: 0;
+        margin-top: 0.125rem;
+    }
+
+    .step-1 .step-number { background: #3b82f6; color: white; }
+    .step-2 .step-number { background: #8b5cf6; color: white; }
+    .step-3 .step-number { background: #10b981; color: white; }
+
+    .step-content {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .step-title {
+        font-weight: 600;
+        color: #1f2937;
+        font-size: 0.7rem; /* Smaller */
+        line-height: 1.2;
+        margin-bottom: 0.125rem;
+    }
+
+    .step-description {
+        color: #6b7280;
+        font-size: 0.6rem; /* Smaller */
+        line-height: 1.3;
+    }
+
+    /* Progress bar for mobile */
+    .steps-progress {
+        margin-top: 0.75rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid #e5e7eb;
+    }
+
+    .progress-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+    }
+
+    .progress-text {
+        font-size: 0.7rem;
+        font-weight: 500;
+        color: #3b82f6;
+    }
+
+    .progress-step {
+        font-size: 0.65rem;
+        color: #6b7280;
+    }
+
+    .progress-bar {
+        width: 100%;
+        height: 4px;
+        background: #e5e7eb;
+        border-radius: 2px;
+        overflow: hidden;
+    }
+
+    .progress-fill {
+        height: 100%;
+        background: #8b5cf6;
+        border-radius: 2px;
+        width: 66.66%;
+    }
+
+    /* Scrollbar styling for outfit grid */
+    .outfit-grid::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    .outfit-grid::-webkit-scrollbar-track {
+        background: #f1f5f9;
+        border-radius: 2px;
+    }
+
+    .outfit-grid::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 2px;
+    }
+
+    .outfit-grid::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+    }
+
+    /* Mobile Responsive */
+    @media (max-width: 768px) {
+        .image-container-fullscreen {
+            height: 60vh;
+            border-radius: 8px;
+        }
+        
+        .modal-content {
+            padding: 1rem;
+            margin: 1rem;
+        }
+        
+        .outfit-panel {
+            width: 100%;
+            border-radius: 0;
+            padding: 1rem;
+        }
+        
+        .outfit-grid {
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+            height: auto;
+            max-height: 50vh;
+        }
+    
+        .outfit-image {
+            height: 120px;
+        }
+
+        .steps-container {
+            margin-bottom: 0.75rem;
+            padding: 0.75rem;
+        }
+        
+        .step-item {
+            gap: 0.5rem;
+        }
+        
+        .step-number {
+            width: 20px;
+            height: 20px;
+            font-size: 0.65rem;
+        }
+        
+        .step-title {
+            font-size: 0.7rem;
+        }
+        
+        .step-description {
+            font-size: 0.6rem;
+        }
+    }
+
+    /* Touch-friendly buttons */
+    button {
+        touch-action: manipulation;
+        transition: all 0.2s ease;
+    }
+
+    button:hover { transform: translateY(-1px); }
+    button:active { transform: translateY(0); }
+
+    /* Type badges */
+    .outfit-card .absolute.top-2.left-2 {
+        top: 8px;
+        left: 8px;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 4px 8px;
+        border-radius: 8px;
+        font-size: 0.7rem;
+        font-weight: 600;
+    }
+
+    /* Image preloading feedback styles */
+    .cached-image { opacity: 1; transition: opacity 0.2s ease; }
+    .loading-image { opacity: 0.8; transition: opacity 0.3s ease; }
+    .loading-image.loaded { opacity: 1; }
+
+    /* Preload indicator */
+    .preload-indicator {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 8px 12px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        z-index: 1000;
+        display: none;
+    }
+
+    /* Image loading states */
+    .image-loading {
+        background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+        background-size: 200% 100%;
+        animation: loading 1.5s infinite;
+    }
+
+    @keyframes loading {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+    }
+
+    .loading-progress {
+        width: 100%;
+        height: 4px;
+        background: #e5e7eb;
+        border-radius: 2px;
+        overflow: hidden;
+        margin-top: 10px;
+    }
+
+    .loading-progress-bar {
+        height: 100%;
+        background: #3b82f6;
+        border-radius: 2px;
+        animation: progressAnimation 2s ease-in-out infinite;
+    }
+
+    @keyframes progressAnimation {
+        0% { transform: translateX(-100%); }
+        50% { transform: translateX(0%); }
+        100% { transform: translateX(100%); }
+    }
+
+    .loading-phase { transition: all 0.3s ease; }
+    .phase-preparing { color: #3b82f6; }
+    .phase-generating { color: #8b5cf6; }
+    .phase-finalizing { color: #10b981; }
+
+    /* Logo styles */
+.holord-logo {
+    height: 48px;
+    width: auto;
+    object-fit: contain;
+    filter: brightness(0) invert(1); /* Makes black logo white */
+}
+
+/* NEW: Combined outfit sections with single scroll - Made more compact */
+/* FIXED: Remove fixed height and let content determine height */
+.outfit-sections-container {
+    /* Remove max-height: 35vh */
+    overflow-y: auto;
+    margin-bottom: 1rem;
+    padding-right: 0.5rem;
+    flex: 1; /* This makes it take available space */
+}
+
+.outfit-section {
+    margin-bottom: 1rem; /* Reduced from 1.5rem */
+}
+
+.section-header {
+    margin-bottom: 0.5rem; /* Reduced from 0.75rem */
+}
+
+/* Make selection displays more compact */
+#selectedTopDisplay, 
+#selectedBottomDisplay,
+#fullOutfitMessage {
+    padding: 0.5rem; /* Reduced padding */
+    margin-bottom: 0.5rem; /* Reduced margin */
+    font-size: 0.75rem; /* Smaller text */
+}
+
+/* FIXED: Generate button appears directly below content, not fixed at bottom */
+.generate-button-container {
+    background: transparent !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+    margin-top: 1rem;
+    border-top: none !important;
+}
+
+
+/* NEW: Added styles for better button placement */
+.outfit-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.outfit-sections-container {
+    flex: 1;
+    overflow-y: auto;
+    margin-bottom: 1rem;
+}
+
+.generate-button-container {
+    margin-top: auto; /* Push to bottom of container */
+    padding: 1rem 0 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Ensure the button has no extra whitespace */
+#submitBtn {
+    margin: 0;
+    width: 100%;
+}
+
+/* NEW: Theme selection styles */
+.theme-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.theme-card {
+    transition: all 0.3s ease;
+    border-radius: 12px;
+    overflow: hidden;
+    cursor: pointer;
+    border: 2px solid transparent;
+    background: white;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    position: relative;
+}
+
+.theme-card:hover {
+    transform: scale(1.03);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+    border-color: #3b82f6;
+}
+
+.theme-card.selected {
+    transform: scale(1.05);
+    border-color: #2563eb;
+    box-shadow: 0 10px 25px rgba(37, 99, 235, 0.2);
+}
+
+.theme-image {
+    width: 100%;
+    height: 120px;
+    object-fit: cover;
+    background: #f8fafc;
+}
+
+.theme-name {
+    padding: 0.75rem;
+    text-align: center;
+    font-weight: 600;
+    color: #1f2937;
+    font-size: 0.8rem;
+}
+
+.theme-description {
+    padding: 0 0.75rem 0.75rem;
+    text-align: center;
+    color: #6b7280;
+    font-size: 0.7rem;
+}
+
+.selection-mode-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 0.75rem;
+}
+
+.selection-mode-tab {
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    border: 1px solid #d1d5db;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.8rem;
+    font-weight: 500;
+    flex: 1;
+    text-align: center;
+}
+
+.selection-mode-tab.active {
+    background: #3b82f6;
+    color: white;
+    border-color: #3b82f6;
+}
+
+.theme-items-list {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 0.75rem;
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    color: #4b5563;
+}
+
+.theme-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.theme-item:last-child {
+    margin-bottom: 0;
+}
+
+.theme-item-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+</style>
+</head>
+<body>
+
+    <!-- Upload Area -->
+    <div id="uploadArea" class="upload-area">
+        <h2 class="text-2xl font-bold mb-4">Virtual Try-On Setup</h2>
+
+        <!-- Step 1: Choose Photo Source -->
+        <div class="mb-6 p-4 bg-blue-50 rounded-lg">
+            <h3 class="text-lg font-semibold mb-4">
+                Step 1: Choose Your Photo Source
+            </h3>
+
+            <!-- Option 1: Webcam Capture -->
+            <div
+                class="mb-4 p-4 bg-white rounded-lg border border-gray-200"
+            >
+                <h4 class="font-semibold mb-2">
+                    📸 Take Photo with Webcam
+                </h4>
+                <p class="text-gray-600 mb-3">
+                    Capture a live photo using your camera
+                </p>
+                <button
+                    onclick="startWebcam()"
+                    class="bg-green-600 text-white px-4 py-2 rounded-full hover:bg-green-700 w-full"
+                >
+                    Start Webcam
+                </button>
+            </div>
+
+            <!-- Option 2: File Upload -->
+            <div class="p-4 bg-white rounded-lg border border-gray-200">
+                <h4 class="font-semibold mb-2">📁 Upload Photo File</h4>
+                <p class="text-gray-600 mb-2">
+                    Select an existing photo from your device
+                </p>
+                <input
+                    type="file"
+                    id="fileInput"
+                    accept="image/*"
+                    class="mb-2 w-full"
+                />
+                <button
+                    onclick="loadImageFromFile()"
+                    class="bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 w-full"
+                >
+                    Upload Photo
+                </button>
+            </div>
+
+            <div id="userStatus" class="mt-3 text-sm text-gray-600"></div>
+        </div>
+    </div>
+
+    <!-- Webcam Capture Interface -->
+    <div id="webcamContainer" class="webcam-container hidden">
+        <h3 class="text-xl font-bold mb-4">📸 Take Your Photo</h3>
+        <video id="webcamVideo" autoplay playsinline></video>
+        <canvas id="webcamCanvas" class="hidden"></canvas>
+        <div id="capturedImageContainer" class="hidden">
+            <img
+                id="capturedImage"
+                class="captured-image"
+                alt="Captured photo"
+            />
+        </div>
+        <div class="flex gap-2 justify-center">
+
+            <button id="retakeBtn" class="retake-btn hidden">
+                🔄 Retake
+            </button>
+            <button id="usePhotoBtn" class="capture-btn hidden">
+                ✅ Use This Photo
+            </button>
+        </div>
+        <button
+            onclick="closeWebcam()"
+            class="mt-3 text-gray-600 hover:text-gray-800"
+        >
+            ← Back
+        </button>
+    </div>
+        <button id="captureBtn" class="capture-btn">
+                📷 Capture Photo
+            </button>
+    <!-- Fullscreen Photo Background -->
+    <div class="photo-background">
+        <img id="userPhotoBackground" src="" alt="" style="display: none" />
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay hidden">
+        <div class="spinner"></div>
+        <h3 class="text-xl font-semibold mb-2">
+            Creating your perfect look!
+        </h3>
+        <p class="text-white/80"></p>
+        <div id="debugInfo" class="mt-4 text-sm text-white/60"></div>
+    </div>
+
+    <!-- Result Modal -->
+    <div id="resultModal" class="result-modal hidden">
+        <div class="modal-content" style="max-width: 95vw; max-height: 95vh;">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">
+                Your perfect look!
+            </h2>
+            
+            <!-- Fullscreen Image Container -->
+            <div class="mb-6">
+                <div class="result-label">Your Virtual Try-On Result</div>
+                <div class="image-container-fullscreen" id="fullscreenImageContainer">
+                    <img
+                        id="generatedImageFullscreen"
+                        src=""
+                        alt="Virtual Try-On Result"
+                        class="generated-image-fullscreen"
+                    />
+                </div>
+                
+            </div>
+
+            <!-- QR Code Section -->
+            <div class="qr-code" id="qrCodeSection" style="display: none">
+                <h3 class="font-semibold text-gray-700 mb-2 text-center">
+                    Share Your Look
+                </h3>
+                <img
+                    id="qrCodeImage"
+                    src=""
+                    alt="QR Code"
+                    class="mx-auto w-32 h-32"
+                />
+                <p class="text-sm text-gray-600 mt-2 text-center">
+                    Scan to view your virtual try-on
+                </p>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex flex-col gap-3 mt-6">
+            
+                <div class="grid grid-cols-2 gap-3">
+                    <button
+                        id="tryAnother"
+                        class="bg-purple-600 text-white px-6 py-3 rounded-full hover:bg-purple-700 transition-colors"
+                    >
+                        Try Another Outfit
+                    </button>
+                    <button
+                        id="closeModal"
+                        class="bg-gray-600 text-white px-6 py-3 rounded-full hover:bg-gray-700 transition-colors"
+                    >
+                        Close
+                    </button>
+                </div>
+            </div>
+
+
+        </div>
+    </div>
+
+    <!-- Floating Header -->
+<div
+    class="floating-ui top-0 left-0 w-full p-6"
+    style="display: none"
+    id="mainUI"
+>
+    <div class="flex justify-between items-center">
+        <!-- Clean Holord Logo -->
+        <div class="flex items-center space-x-3">
+            <img 
+                src="logo.png" 
+                alt="Holord" 
+                class="holord-logo"
+                style="height: 80px;"
+            >
+            <div class="flex flex-col">
+                <!-- <h1 class="text-2xl font-bold text-white" style="font-family: 'Cano', sans-serif;">HOLORD</h1> -->
+                <!-- <p class="text-white/80 text-sm">Shop > Style > Perfect Look</p> -->
+            </div>
+        </div>
+        
+        <!-- Step Indicator -->
+
+    </div>
+</div>
+
+    <!-- Floating Outfit Selection Panel -->
+<div
+    class="floating-ui top-0 right-0 h-full"
+    style="display: none; height: 100vh; display: flex; align-items: flex-start; justify-content: flex-end; padding-top: 2rem;"
+    id="outfitUI"
+>
+    <div class="outfit-panel w-96">
+        <div class="flex flex-col h-full">
+            <div class="mb-4">
+                <h1 class="text-xl font-bold text-gray-800 mb-3" style="font-family: 'Outfit', sans-serif; font-weight: 600;">
+                    Create Your Perfect Look
+                </h1>
+                
+                <!-- Steps Container -->
+                <div class="steps-container">
+                    <div class="steps-grid">
+                        <!-- Step 1 -->
+                        <div class="step-item step-1">
+                            <div class="step-number">1</div>
+                            <div class="step-content">
+                                <div class="step-title">Strike a Pose</div>
+                                <div class="step-description">Stand in frame for your perfect shot</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Step 2 -->
+                        <div class="step-item step-2">
+                            <div class="step-number">2</div>
+                            <div class="step-content">
+                                <div class="step-title">Style Your Look</div>
+                                <div class="step-description">Mix & match outfits you love</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Step 3 -->
+                        <div class="step-item step-3">
+                            <div class="step-number">3</div>
+                            <div class="step-content">
+                                <div class="step-title">Reveal Magic</div>
+                                <div class="step-description">Watch your outfit come alive!</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Mobile Progress Bar -->
+                    <div class="steps-progress md:hidden">
+                        <div class="progress-header">
+                            <span class="progress-text">Step 2 of 3</span>
+                            <span class="progress-step">Style Your Look</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NEW: Selection Mode Tabs -->
+            <div class="selection-mode-tabs">
+                <button class="selection-mode-tab active" data-mode="theme">
+                    🎨 Themes
+                </button>
+                <button class="selection-mode-tab" data-mode="custom">
+                    🧩 Custom Mix
+                </button>
+            </div>
+
+            <!-- Combined Outfit Sections with Single Scroll -->
+            <div class="outfit-sections-container">
+                <!-- Theme Selection Section -->
+                <div class="outfit-section" id="themeSection">
+                    <div class="section-header">
+                        <h3 class="text-base font-semibold text-gray-800 mb-2 flex items-center">
+                            <span class="w-5 h-5 bg-[#2D3FA8] text-white rounded-full flex items-center justify-center text-xs mr-2">1</span>
+                            Choose Your Theme
+                        </h3>
+                    </div>
+                    <div class="theme-grid" id="themesGrid"></div>
+                    <div id="selectedThemeDisplay" class="hidden p-3 bg-purple-50 border border-purple-200 rounded-lg mb-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium text-purple-800">Selected: <span id="selectedThemeName"></span></span>
+                            <button id="changeThemeBtn" class="text-xs bg-purple-200 text-purple-700 px-2 py-1 rounded hover:bg-purple-300">
+                                Change
+                            </button>
+                        </div>
+                        <div id="themeItemsList" class="theme-items-list mt-2"></div>
+                    </div>
+                </div>
+
+                <!-- Custom Selection Section (Hidden by default) -->
+                <div class="outfit-section hidden" id="customSection">
+                    <!-- Tops Section -->
+                    <div class="outfit-section">
+                        <div class="section-header">
+                            <h3 class="text-base font-semibold text-gray-800 mb-2 flex items-center">
+                                <span class="w-5 h-5 bg-[#2D3FA8] text-white rounded-full flex items-center justify-center text-xs mr-2">1</span>
+                                Choose Your Top
+                            </h3>
+                        </div>
+                        <div class="outfit-grid mb-3" id="topsGrid"></div>
+                        <div id="selectedTopDisplay" class="hidden p-3 bg-green-50 border border-green-200 rounded-lg mb-2">
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm font-medium text-green-800">Selected: <span id="selectedTopName"></span></span>
+                                <button id="changeTopBtn" class="text-xs bg-green-200 text-green-700 px-2 py-1 rounded hover:bg-green-300">
+                                    Change
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bottoms Section -->
+                    <div class="outfit-section">
+                        <div class="section-header">
+                            <h3 class="text-base font-semibold text-gray-800 mb-2 flex items-center">
+                                <span class="w-5 h-5 bg-[#2D3FA8] text-white rounded-full flex items-center justify-center text-xs mr-2">2</span>
+                                Choose Your Bottom
+                            </h3>
+                        </div>
+                        <div class="outfit-grid mb-3" id="bottomsGrid"></div>
+                        <div id="selectedBottomDisplay" class="hidden p-3 bg-blue-50 border border-blue-200 rounded-lg mb-2">
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm font-medium text-blue-800">Selected: <span id="selectedBottomName"></span></span>
+                                <button id="changeBottomBtn" class="text-xs bg-blue-200 text-blue-700 px-2 py-1 rounded hover:bg-blue-300">
+                                    Change
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Full Outfit Message -->
+                    <div id="fullOutfitMessage" class="hidden p-3 bg-purple-50 border border-purple-200 rounded-lg mb-4">
+                        <div class="flex items-center">
+                            <svg class="w-4 h-4 text-purple-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <span class="text-sm text-purple-700">Full outfit selected - no bottom needed</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Generate Button - Fixed at Bottom -->
+            <div class="generate-button-container">
+                <button
+                    id="submitBtn"
+                    class="bg-[#2D3FA8] hover:bg-blue-800 text-white font-semibold px-6 py-3 rounded-full w-full flex items-center justify-center disabled:opacity-50 transition-all duration-200"
+                    disabled
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-5 w-5 mr-2"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M13 10V3L4 14h7v7l9-11h-7z"
+                        />
+                    </svg>
+                    Generate Your Outfit
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Global variables
+    let selectedTop = null;
+    let selectedBottom = null;
+    let selectedTheme = null;
+    let currentImageData = null;
+    let currentImageFile = null;
+    let webcamStream = null;
+    let isCapturing = false;
+    let availableCameras = [];
+    let currentSelectionMode = 'theme'; // 'theme' or 'custom'
+
+    // Footwear mapping - You can remove this if not needed
+    const footwearMap = {
+        'gym': {
+            type: 'athletic_shoes',
+            display: '👟 Athletic Shoes',
+            file: 'footwear/athletic_shoes.png'
+        },
+        'formal': {
+            type: 'dress_shoes',
+            display: '👞 Dress Shoes',
+            file: 'footwear/dress_shoes.png'
+        },
+        'dresses': {
+            type: 'high_heels',
+            display: '👠 High Heels',
+            file: 'footwear/high_heels.png'
+        },
+        'casual': {
+            type: 'sneakers',
+            display: '👟 Sneakers',
+            file: 'footwear/sneakers.png'
+        },
+        'luxury': {
+            type: 'boots',
+            display: '👢 Boots',
+            file: 'footwear/boots.png'
+        },
+        'default': {
+            type: 'casual_shoes',
+            display: '👞 Casual Shoes',
+            file: 'footwear/casual_shoes.png'
+        }
+    };
+
+    // Outfits array for custom mix mode
+    const outfits = [
+        {
+            id: 1,
+            name: "Black Hoodie",
+            category: "casual",
+            image: "clothing/black_hoodie.png",
+            clothingFile: "black_hoodie.png",
+            type: "top"
+        },
+        {
+            id: 2,
+            name: "Formal Suit",
+            category: "formal",
+            image: "clothing/suit.png",
+            clothingFile: "suit.png",
+            type: "top"
+        },
+        {
+            id: 3,
+            name: "Gucci top",
+            category: "dresses",
+            image: "clothing/gucci.png",
+            clothingFile: "gucci.png",
+            type: "top"
+        },
+        {
+            id: 4,
+            name: "Furry Coat",
+            category: "luxury",
+            image: "clothing/coat.png",
+            clothingFile: "coat.png",
+            type: "top"
+        },
+        {
+            id: 5,
+            name: "Green linen shirt",
+            category: "bottoms",
+            image: "clothing/green_linen.png",
+            clothingFile: "green_linen.png",
+            type: "top"
+        },
+        {
+            id: 6,
+            name: "Plain white pants",
+            category: "formal",
+            image: "clothing/white_pants.png",
+            clothingFile: "white_pants.png",
+            type: "bottom"
+        },
+        {
+            id: 7,
+            name: "Brown pants",
+            category: "bottoms",
+            image: "clothing/brown_shorts.png",
+            clothingFile: "brown_shorts.png",
+            type: "bottom"
+        }, 
+        {
+            id: 8,
+            name: "Holord Tee",
+            category: "casual",
+            image: "clothing/holord_tee.png",
+            clothingFile: "holord_tee.png",
+            type: "top"
+        },
+        {
+            id: 9,
+            name: "designer shirt",
+            category: "casual",
+            image: "clothing/designer_shirt.png",
+            clothingFile: "designer_shirt.png",
+            type: "top"
+        },
+        {
+            id: 10,
+            name: "Striped Shirt",
+            category: "casual",
+            image: "clothing/maroon_top.png",
+            clothingFile: "maroon_top.png",
+            type: "top"
+        },
+        {
+            id: 11,
+            name: "Skirt",
+            category: "casual",
+            image: "clothing/designer_pants.png",
+            clothingFile: "designer_pants.png",
+            type: "bottom"
+        },
+        {
+            id: 12,
+            name: "Leopard Printed Pants",
+            category: "casual",
+            image: "clothing/leopard_print.png",
+            clothingFile: "leopard_print.png",
+            type: "bottom"
+        },
+    ];
+
+    // NEW: Themes array with complete outfits - ARABIC THOBE ADDED
+    const themes = [
+        {
+            id: 'arabic_thobe',
+            name: "Arabic Thobe",
+            description: "Traditional Arabic thobe with headwear",
+            image: "themes/arabic_thobe_preview.jpg",
+            items: [
+                { name: "Arabic Thobe", type: "top", clothingFile: "arabic_thobe.png" }
+            ]
+        },
+        {
+            id: 'f1',
+            name: "F1 Racing Theme",
+            description: "Complete racing-inspired outfit",
+            image: "themes/f1_theme.jpg",
+            items: [
+                { name: "Racing Jacket", type: "top", clothingFile: "f1_jacket.png" },
+                { name: "Racing Pants", type: "bottom", clothingFile: "f1_pants.png" },
+                { name: "Racing Shoes", type: "footwear", footwearType: "athletic_shoes", footwearFile: "footwear/athletic_shoes.png" }
+            ]
+        }
+    ];
+
+    // Initialize the application
+    function initializeApp() {
+        // Check for photo from capture.html
+        const savedPhoto = localStorage.getItem("userPhoto");
+        if (savedPhoto && savedPhoto.length > 1000 && savedPhoto !== "data:,") {
+            console.log("Photo found in localStorage!");
+            
+            // Set global variables
+            currentImageData = savedPhoto;
+            currentImageFile = dataURLtoFile(savedPhoto, "captured_photo.jpg");
+            
+            // Set as background
+            const bgImg = document.getElementById("userPhotoBackground");
+            bgImg.src = currentImageData;
+            bgImg.style.display = "block";
+            
+            // Hide upload area, show main UI
+            document.getElementById("uploadArea").style.display = "none";
+            document.getElementById("mainUI").style.display = "block";
+            document.getElementById("outfitUI").style.display = "block";
+            
+            console.log("✓ Photo loaded from camera capture!");
+            
+            // Initialize outfit selection
+            initializeOutfitSelection();
+            
+        } else {
+            console.log("No valid photo found - showing upload options");
+        }
+
+        // Initialize event listeners
+        setupEventListeners();
+        getAvailableCameras();
+    }
+
+    // Initialize outfit selection
+    function initializeOutfitSelection() {
+        renderThemes();
+        renderTops();
+        renderBottoms();
+        setupSelectionListeners();
+        setupSelectionModeListeners();
+    }
+
+    // Setup selection mode listeners
+    function setupSelectionModeListeners() {
+        const modeTabs = document.querySelectorAll('.selection-mode-tab');
+        
+        modeTabs.forEach(tab => {
+            tab.addEventListener('click', function() {
+                const mode = this.getAttribute('data-mode');
+                
+                // Update active tab
+                modeTabs.forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+                
+                // Update selection mode
+                currentSelectionMode = mode;
+                
+                // Show/hide appropriate sections
+                if (mode === 'theme') {
+                    document.getElementById('themeSection').classList.remove('hidden');
+                    document.getElementById('customSection').classList.add('hidden');
+                    // Clear custom selections when switching to theme mode
+                    selectedTop = null;
+                    selectedBottom = null;
+                    updateTopSelection();
+                    updateBottomSelection();
+                } else {
+                    document.getElementById('themeSection').classList.add('hidden');
+                    document.getElementById('customSection').classList.remove('hidden');
+                    // Clear theme selection when switching to custom mode
+                    selectedTheme = null;
+                    updateThemeSelection();
+                }
+                
+                updateSubmitButton();
+            });
+        });
+    }
+
+    // Setup selection listeners
+    function setupSelectionListeners() {
+        // Change buttons
+        document.getElementById('changeTopBtn').addEventListener('click', function() {
+            selectedTop = null;
+            updateTopSelection();
+            updateSubmitButton();
+        });
+
+        document.getElementById('changeBottomBtn').addEventListener('click', function() {
+            selectedBottom = null;
+            updateBottomSelection();
+            updateSubmitButton();
+        });
+
+        document.getElementById('changeThemeBtn').addEventListener('click', function() {
+            selectedTheme = null;
+            updateThemeSelection();
+            updateSubmitButton();
+        });
+    }
+
+    // NEW: Render themes
+    function renderThemes() {
+        const themesGrid = document.getElementById("themesGrid");
+        themesGrid.innerHTML = "";
+
+        if (themes.length === 0) {
+            themesGrid.innerHTML = '<div class="placeholder-text">No themes available</div>';
+            return;
+        }
+
+        themes.forEach((theme) => {
+            const themeElement = document.createElement("div");
+            themeElement.className = "theme-card";
+            
+            const isSelected = selectedTheme && selectedTheme.id === theme.id;
+            
+            themeElement.innerHTML = `
+                <img src="${theme.image}" 
+                     alt="${theme.name}" 
+                     class="theme-image"
+                     onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjE1MCIgeT0iMTAwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM2YjcyODAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPlRoZW1lIEltYWdlPC90ZXh0Pjwvc3ZnPg=='">
+                <div class="theme-name">${theme.name}</div>
+                <div class="theme-description">${theme.description}</div>
+            `;
+
+            if (isSelected) {
+                themeElement.classList.add("selected");
+                const badge = document.createElement('div');
+                badge.className = 'selection-badge';
+                badge.textContent = '✓';
+                themeElement.appendChild(badge);
+            }
+
+            themeElement.addEventListener("click", () => selectTheme(theme, themeElement));
+            themesGrid.appendChild(themeElement);
+        });
+    }
+
+    // NEW: Select theme
+    function selectTheme(theme, element) {
+        selectedTheme = theme;
+        updateThemeSelection();
+        updateSubmitButton();
+    }
+
+    // NEW: Update theme selection display
+    function updateThemeSelection() {
+        const themeDisplay = document.getElementById('selectedThemeDisplay');
+        const themeName = document.getElementById('selectedThemeName');
+        const themeItemsList = document.getElementById('themeItemsList');
+        
+        if (selectedTheme) {
+            themeDisplay.classList.remove('hidden');
+            themeName.textContent = selectedTheme.name;
+            
+            // Build items list
+            let itemsHTML = '';
+            selectedTheme.items.forEach(item => {
+                let icon = '👕';
+                if (item.type === 'bottom') icon = '👖';
+                if (item.type === 'footwear') icon = '👟';
+                if (item.type === 'full') icon = '👔';
+                
+                itemsHTML += `
+                    <div class="theme-item">
+                        <span class="theme-item-icon">${icon}</span>
+                        <span>${item.name}</span>
+                    </div>
+                `;
+            });
+            themeItemsList.innerHTML = itemsHTML;
+            
+            renderThemes(); // Re-render to show selection
+        } else {
+            themeDisplay.classList.add('hidden');
+            renderThemes(); // Re-render to clear selection
+        }
+    }
+
+    // Render tops (including full outfits)
+    function renderTops() {
+        const topsGrid = document.getElementById("topsGrid");
+        topsGrid.innerHTML = "";
+
+        const tops = outfits.filter(outfit => outfit.type === "top" || outfit.type === "full");
+
+        if (tops.length === 0) {
+            topsGrid.innerHTML = '<div class="placeholder-text">No tops available</div>';
+            return;
+        }
+
+        tops.forEach((outfit) => {
+            const outfitElement = createOutfitElement(outfit, 'top');
+            topsGrid.appendChild(outfitElement);
+        });
+    }
+
+    // Render bottoms
+    function renderBottoms() {
+        const bottomsGrid = document.getElementById("bottomsGrid");
+        bottomsGrid.innerHTML = "";
+
+        const bottoms = outfits.filter(outfit => outfit.type === "bottom");
+
+        if (bottoms.length === 0) {
+            bottomsGrid.innerHTML = '<div class="placeholder-text">No bottoms available</div>';
+            return;
+        }
+
+        bottoms.forEach((outfit) => {
+            const outfitElement = createOutfitElement(outfit, 'bottom');
+            bottomsGrid.appendChild(outfitElement);
+        });
+    }
+
+    // Create outfit element
+    function createOutfitElement(outfit, stepType) {
+        const outfitElement = document.createElement("div");
+        outfitElement.className = "outfit-card";
+        
+        const isSelected = (stepType === 'top' && selectedTop && selectedTop.id === outfit.id) || 
+                          (stepType === 'bottom' && selectedBottom && selectedBottom.id === outfit.id);
+        
+        outfitElement.innerHTML = `
+            <div class="relative h-full">
+                <img src="${outfit.image}" 
+                     alt="${outfit.name}" 
+                     class="outfit-image"
+                     onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjE1MCIgeT0iMTAwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM2YjcyODAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPk91dGZpdCBJbWFnZTwvdGV4dD48L3N2Zz4='">
+            </div>
+            <div class="outfit-name">${outfit.name}</div>
+        `;
+
+        if (isSelected) {
+            outfitElement.classList.add("selected");
+            const badge = document.createElement('div');
+            badge.className = 'selection-badge';
+            badge.textContent = '✓';
+            outfitElement.appendChild(badge);
+        }
+
+        outfitElement.addEventListener("click", () => selectOutfit(outfit, stepType, outfitElement));
+        return outfitElement;
+    }
+
+    // Select outfit
+    function selectOutfit(outfit, stepType, element) {
+        if (stepType === 'top') {
+            selectedTop = outfit;
+            updateTopSelection();
+            
+            // If full outfit is selected, hide bottoms section
+            if (outfit.type === "full") {
+                selectedBottom = null;
+                document.getElementById('fullOutfitMessage').classList.remove('hidden');
+            } else {
+                document.getElementById('fullOutfitMessage').classList.add('hidden');
+            }
+        } else if (stepType === 'bottom') {
+            selectedBottom = outfit;
+            updateBottomSelection();
+        }
+        
+        updateSubmitButton();
+        updateSelectedOutfitsDisplay();
+    }
+
+    // Update top selection display
+    function updateTopSelection() {
+        const topDisplay = document.getElementById('selectedTopDisplay');
+        const topName = document.getElementById('selectedTopName');
+        
+        if (selectedTop) {
+            topDisplay.classList.remove('hidden');
+            topName.textContent = selectedTop.name;
+            renderTops(); // Re-render to show selection
+        } else {
+            topDisplay.classList.add('hidden');
+            renderTops(); // Re-render to clear selection
+        }
+    }
+
+    // Update bottom selection display
+    function updateBottomSelection() {
+        const bottomDisplay = document.getElementById('selectedBottomDisplay');
+        const bottomName = document.getElementById('selectedBottomName');
+        
+        if (selectedBottom) {
+            bottomDisplay.classList.remove('hidden');
+            bottomName.textContent = selectedBottom.name;
+            renderBottoms(); // Re-render to show selection
+        } else {
+            bottomDisplay.classList.add('hidden');
+            renderBottoms(); // Re-render to clear selection
+        }
+    }
+
+    // Update selected outfits display
+    function updateSelectedOutfitsDisplay() {
+        const display = document.getElementById("selectedOutfitsDisplay");
+        const itemsList = document.getElementById("selectedItemsList");
+        
+        if (selectedTop) {
+            let selectionHTML = `<span class="selected-item">${selectedTop.name} (${selectedTop.type})</span>`;
+            
+            if (selectedBottom && selectedTop.type !== "full") {
+                selectionHTML += `<span class="selected-item">${selectedBottom.name} (${selectedBottom.type})</span>`;
+            }
+            
+            itemsList.innerHTML = selectionHTML;
+            display.classList.remove("hidden");
+        } else {
+            display.classList.add("hidden");
+            itemsList.innerHTML = '';
+        }
+    }
+
+    // Update submit button state
+    function updateSubmitButton() {
+        const submitBtn = document.getElementById("submitBtn");
+        let canSubmit = false;
+        
+        if (currentSelectionMode === 'theme') {
+            // Enable if a theme is selected
+            canSubmit = selectedTheme !== null;
+        } else {
+            // Enable if at least a top is selected
+            canSubmit = selectedTop && (selectedTop.type === "full" || selectedBottom);
+        }
+        
+        submitBtn.disabled = !canSubmit;
+    }
+
+    // Get selected outfits for form data - UPDATED FOR SINGLE-ITEM THEMES
+    function getSelectedOutfits() {
+        if (currentSelectionMode === 'theme' && selectedTheme) {
+            // Return all items from the selected theme
+            return selectedTheme.items;
+        } else {
+            // Return custom selections
+            const selectedOutfits = [];
+            if (selectedTop) selectedOutfits.push(selectedTop);
+            if (selectedBottom && selectedTop.type !== "full") selectedOutfits.push(selectedBottom);
+            return selectedOutfits;
+        }
+    }
+
+    // Determine footwear based on selected outfits - UPDATED FOR THEMES
+    function determineFootwear(selectedOutfits) {
+        // If using theme mode and theme has footwear, use that
+        if (currentSelectionMode === 'theme' && selectedTheme) {
+            const themeFootwear = selectedTheme.items.find(item => item.type === 'footwear');
+            if (themeFootwear) {
+                return {
+                    type: themeFootwear.footwearType,
+                    display: themeFootwear.name,
+                    file: themeFootwear.footwearFile
+                };
+            }
+        }
+        
+        // Fallback to original logic for custom mode
+        if (selectedOutfits.length === 0) {
+            return footwearMap.default;
+        }
+
+        const primaryOutfit = selectedOutfits[0];
+        
+        if (primaryOutfit.name.toLowerCase().includes('gym')) {
+            return footwearMap.gym;
+        }
+        
+        if (primaryOutfit.category === 'formal') {
+            return footwearMap.formal;
+        }
+        
+        if (primaryOutfit.category === 'dresses') {
+            return footwearMap.dresses;
+        }
+        
+        if (primaryOutfit.category === 'luxury') {
+            return footwearMap.luxury;
+        }
+        
+        return footwearMap.casual;
+    }
+
+    // Setup all event listeners
+    function setupEventListeners() {
+        // Webcam buttons
+        document.getElementById("captureBtn").addEventListener("click", capturePhoto);
+        document.getElementById("retakeBtn").addEventListener("click", retakePhoto);
+        document.getElementById("usePhotoBtn").addEventListener("click", useCapturedPhoto);
+
+        // Modal buttons
+        document.getElementById("tryAnother").addEventListener("click", () => {
+            document.getElementById("resultModal").classList.add("hidden");
+            document.getElementById("qrCodeSection").style.display = "none";
+            // Reset selection
+            selectedTop = null;
+            selectedBottom = null;
+            selectedTheme = null;
+            updateTopSelection();
+            updateBottomSelection();
+            updateThemeSelection();
+            updateSubmitButton();
+        });
+
+        document.getElementById("closeModal").addEventListener("click", () => {
+            document.getElementById("resultModal").classList.add("hidden");
+            document.getElementById("qrCodeSection").style.display = "none";
+        });
+
+        // Generate try-on button
+        const submitBtn = document.getElementById("submitBtn");
+        
+        submitBtn.addEventListener("click", async function(event) {
+            console.log("Generate button clicked!");
+            
+            event.preventDefault();
+            event.stopPropagation();
+            
+            await generateTryOn();
+        });
+    }
+
+    // Webcam Functions
+    async function startWebcam() {
+        if (isCapturing) return;
+
+        try {
+            isCapturing = true;
+            document.getElementById("uploadArea").classList.add("hidden");
+            document.getElementById("webcamContainer").classList.remove("hidden");
+
+            const video = document.getElementById("webcamVideo");
+            const constraints = {
+                video: {
+                    width: { ideal: 1080 },
+                    height: { ideal: 1920 },
+                    aspectRatio: 9 / 16,
+                },
+            };
+
+            const lastUsedCameraIndex = localStorage.getItem("lastUsedCameraIndex");
+            if (lastUsedCameraIndex !== null && availableCameras[lastUsedCameraIndex]) {
+                constraints.video.deviceId = {
+                    exact: availableCameras[lastUsedCameraIndex].deviceId,
+                };
+            }
+
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            webcamStream = stream;
+            video.srcObject = stream;
+
+            document.getElementById("captureBtn").classList.remove("hidden");
+            document.getElementById("retakeBtn").classList.add("hidden");
+            document.getElementById("usePhotoBtn").classList.add("hidden");
+            document.getElementById("capturedImageContainer").classList.add("hidden");
+        } catch (error) {
+            console.error("Error accessing webcam:", error);
+            document.getElementById("userStatus").innerHTML =
+                '<span class="text-red-600">Error accessing webcam. Please check permissions.</span>';
+            closeWebcam();
+            isCapturing = false;
+        }
+    }
+
+    function capturePhoto() {
+        if (!webcamStream) return;
+
+        const video = document.getElementById("webcamVideo");
+        const canvas = document.getElementById("webcamCanvas");
+        const capturedImage = document.getElementById("capturedImage");
+
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        const context = canvas.getContext("2d");
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        currentImageData = canvas.toDataURL("image/jpeg");
+        capturedImage.src = currentImageData;
+        currentImageFile = dataURLtoFile(currentImageData, "webcam_capture.jpg");
+
+        document.getElementById("capturedImageContainer").classList.remove("hidden");
+        document.getElementById("captureBtn").classList.add("hidden");
+        document.getElementById("retakeBtn").classList.remove("hidden");
+        document.getElementById("usePhotoBtn").classList.remove("hidden");
+
+        if (webcamStream) {
+            webcamStream.getTracks().forEach((track) => track.stop());
+            webcamStream = null;
+        }
+    }
+
+    function retakePhoto() {
+        document.getElementById("capturedImageContainer").classList.add("hidden");
+        document.getElementById("retakeBtn").classList.add("hidden");
+        document.getElementById("usePhotoBtn").classList.add("hidden");
+        isCapturing = false;
+        startWebcam();
+    }
+
+    function useCapturedPhoto() {
+        const bgImg = document.getElementById("userPhotoBackground");
+        bgImg.src = currentImageData;
+        bgImg.style.display = "block";
+
+        document.getElementById("webcamContainer").classList.add("hidden");
+        document.getElementById("mainUI").style.display = "block";
+        document.getElementById("outfitUI").style.display = "block";
+
+        document.getElementById("userStatus").innerHTML =
+            '<span class="text-green-600">✓ Webcam photo captured successfully!</span>';
+        isCapturing = false;
+        
+        // Initialize outfit selection
+        initializeOutfitSelection();
+    }
+
+    function closeWebcam() {
+        if (webcamStream) {
+            webcamStream.getTracks().forEach((track) => track.stop());
+            webcamStream = null;
+        }
+        document.getElementById("webcamContainer").classList.add("hidden");
+        document.getElementById("uploadArea").classList.remove("hidden");
+        isCapturing = false;
+    }
+
+    function dataURLtoFile(dataurl, filename) {
+        try {
+            const arr = dataurl.split(',');
+            if (arr.length < 2) {
+                throw new Error("Invalid data URL format");
+            }
+            
+            const mimeMatch = arr[0].match(/:(.*?);/);
+            if (!mimeMatch) {
+                throw new Error("Could not determine MIME type");
+            }
+            
+            const mime = mimeMatch[1];
+            const bstr = atob(arr[1]);
+            const n = bstr.length;
+            const u8arr = new Uint8Array(n);
+            
+            for (let i = 0; i < n; i++) {
+                u8arr[i] = bstr.charCodeAt(i);
+            }
+            
+            return new File([u8arr], filename, { type: mime });
+        } catch (error) {
+            console.error("Error converting data URL to file:", error);
+            return null;
+        }
+    }
+
+    // File Upload Functions
+    function loadImageFromFile() {
+        const fileInput = document.getElementById("fileInput");
+        const file = fileInput.files[0];
+        const status = document.getElementById("userStatus");
+
+        if (!file) {
+            status.innerHTML = '<span class="text-red-600">Please select your photo file!</span>';
+            return;
+        }
+
+        currentImageFile = file;
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            currentImageData = e.target.result;
+
+            const bgImg = document.getElementById("userPhotoBackground");
+            bgImg.src = currentImageData;
+            bgImg.style.display = "block";
+
+            document.getElementById("uploadArea").style.display = "none";
+            document.getElementById("mainUI").style.display = "block";
+            document.getElementById("outfitUI").style.display = "block";
+
+            status.innerHTML = '<span class="text-green-600">✓ User image loaded successfully!</span>';
+            
+            // Initialize outfit selection
+            initializeOutfitSelection();
+        };
+
+        reader.onerror = function () {
+            status.innerHTML = '<span class="text-red-600">Error loading user image!</span>';
+        };
+
+        reader.readAsDataURL(file);
+    }
+
+    // Simple form data preparation - UPDATED
+    async function prepareFormData() {
+        try {
+            const formData = new FormData();
+            
+            let imageFile = currentImageFile;
+            
+            if (!imageFile && currentImageData) {
+                imageFile = dataURLtoFile(currentImageData, "user_photo.jpg");
+            }
+            
+            if (!imageFile) {
+                throw new Error("No valid image file available");
+            }
+            
+            formData.append("photo", imageFile);
+            
+            const selectedOutfits = getSelectedOutfits();
+            
+            // Add each clothing item
+            selectedOutfits.forEach((outfit, index) => {
+                formData.append(`clothing_${index}`, outfit.clothingFile);
+            });
+            
+            formData.append("outfit_count", selectedOutfits.length);
+            
+            // Add selection mode info for backend
+            formData.append("selection_mode", currentSelectionMode);
+            if (currentSelectionMode === 'theme' && selectedTheme) {
+                formData.append("theme_id", selectedTheme.id);
+            }
+            
+            return formData;
+            
+        } catch (error) {
+            console.error("Error preparing form data:", error);
+            return null;
+        }
+    }
+
+    // Validation function - UPDATED FOR THEMES
+    function validateInputs() {
+        const issues = [];
+        
+        if (currentSelectionMode === 'theme') {
+            if (!selectedTheme) {
+                issues.push("No theme selected");
+            }
+        } else {
+            const selectedOutfits = getSelectedOutfits();
+            if (selectedOutfits.length === 0) {
+                issues.push("No outfits selected");
+            }
+        }
+        
+        if (!currentImageFile && !currentImageData) {
+            issues.push("No image available");
+        }
+        
+        if (currentImageFile) {
+            if (currentImageFile.size > 10 * 1024 * 1024) {
+                issues.push("Image file too large (max 10MB)");
+            }
+            
+            const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+            if (!validTypes.includes(currentImageFile.type)) {
+                issues.push("Invalid image format. Use JPEG, PNG, or WebP");
+            }
+        }
+        
+        if (issues.length > 0) {
+            alert("Please fix the following issues:\n• " + issues.join("\n• "));
+            return false;
+        }
+        
+        return true;
+    }
+
+    // ⚡ DIRECT IMAGE DISPLAY - No CDN logic
+    async function generateTryOn() {
+        const submitBtn = document.getElementById("submitBtn");
+        const loadingOverlay = document.getElementById("loadingOverlay");
+        const debugInfo = document.getElementById("debugInfo");
+
+        if (!validateInputs()) {
+            return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="pulse">Generating... (60 seconds mafx)</span>';
+        loadingOverlay.classList.remove("hidden");
+        
+        // 60 second timeout for slow backend
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000);
+        
+        try {
+            debugInfo.innerHTML = "Starting image processing...";
+            
+            const formData = await prepareFormData();
+            if (!formData) {
+                throw new Error("Failed to prepare form data");
+            }
+
+            debugInfo.innerHTML = "";
+            console.log("Sending request to backend...");
+
+            const response = await fetch("http://localhost:5000/generate", {
+                method: "POST",
+                body: formData,
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                throw new Error(`Server error: ${response.status}`);
+            }
+
+            const result = await response.json();
+
+            if (result.success) {
+                // ⚡ DIRECT DISPLAY - No CDN, just use the image data directly
+                const modal = document.getElementById("resultModal");
+                const fullscreenImage = document.getElementById("generatedImageFullscreen");
+                
+                if (result.resultImageUrl) {
+                    // If it's a URL, use it directly
+                    fullscreenImage.src = result.resultImageUrl;
+                } else if (result.image_data) {
+                    // If it's base64 data, use it directly
+                    fullscreenImage.src = result.image_data;
+                } else {
+                    throw new Error("No image data in response");
+                }
+                
+                // Show modal immediately
+                loadingOverlay.classList.add("hidden");
+                modal.classList.remove("hidden");
+                
+                debugInfo.innerHTML = "Success! Image loaded directly from backend.";
+                
+            } else {
+                throw new Error(result.error || "Failed to generate image");
+            }
+        } catch (error) {
+            console.error("Error:", error);
+            
+            if (error.name === 'AbortError') {
+                debugInfo.innerHTML = "Timeout - Backend is very slow";
+                alert("🕒 AI processing is taking too long. The backend might be overloaded or the image is too large.");
+            } else {
+                debugInfo.innerHTML = "Error: " + error.message;
+                alert("❌ Error: " + error.message);
+            }
+            
+            loadingOverlay.classList.add("hidden");
+        } finally {
+            clearTimeout(timeoutId);
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>Generate Your Outfit';
+        }
+    }
+
+    // Initialize the app when DOM is loaded
+    document.addEventListener('DOMContentLoaded', initializeApp);
+</script>
+</body>
+</html>

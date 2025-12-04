@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Holord - Capture Photo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      background: black;
+      height: 100vh;
+      overflow: hidden;
+    }
+    
+    .camera-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: black;
+    }
+    
+    .video-wrapper {
+      width: 100%;
+      max-width: 56.25vh; /* Limit width for 9:16 aspect ratio */
+      aspect-ratio: 9/16; /* Force 9:16 aspect ratio (portrait) */
+      position: relative;
+      overflow: hidden;
+    }
+    
+    #video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    
+    .black-bars {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 2;
+    }
+    
+    .black-bar-left, .black-bar-right {
+      position: absolute;
+      top: 0;
+      height: 100%;
+      background: black;
+    }
+    
+    .black-bar-left {
+      left: 0;
+    }
+    
+    .black-bar-right {
+      right: 0;
+    }
+    
+    .floating-ui {
+      position: fixed;
+      z-index: 10;
+      pointer-events: none;
+    }
+    
+    .floating-ui > * {
+      pointer-events: auto;
+    }
+    
+    .positioning-guide {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 5;
+    }
+    
+    /* Simple 3x3 Grid */
+    .grid-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+      pointer-events: none;
+    }
+    
+    .grid-cell {
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    
+    .capture-indicator {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 80px;
+      height: 80px;
+      border: 4px solid white;
+      border-radius: 50%;
+      opacity: 0;
+      z-index: 15;
+    }
+    
+    .pulse {
+      animation: pulse 1.5s infinite;
+    }
+    
+    @keyframes pulse {
+      0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0.7; }
+      50% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.3; }
+      100% { transform: translate(-50%, -50%) scale(0.8); opacity: 0.7; }
+    }
+
+    /* Logo styles */
+    .holord-logo {
+      height: 72px;
+      width: auto;
+      object-fit: contain;
+    }
+
+    /* NEW: Circular capture button styles */
+    .capture-button-container {
+      position: fixed;
+      top: 50%;  /* push a bit lower than center */
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 10;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    @keyframes fadeCountdown {
+      0% { opacity: 0; transform: scale(0.8); }
+      50% { opacity: 1; transform: scale(1.2); }
+      100% { opacity: 0; transform: scale(1); }
+    }
+
+    .countdown-fade {
+      animation: fadeCountdown 1s ease-in-out;
+    }
+
+    .circular-capture-btn {
+      width: 120px;   /* was 80px */
+      height: 120px;  /* was 80px */
+      border-radius: 50%;
+      background: white;
+      color: black;
+      font-weight: 600;
+      font-size: 1rem;  /* bigger text */
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      border: none;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      cursor: pointer;
+      transition: all 0.3s ease;
+      padding: 0;
+    }
+
+    .circular-capture-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 6px 25px rgba(0, 0, 0, 0.4);
+    }
+
+    .circular-capture-btn:active {
+      transform: scale(0.95);
+    }
+
+    .circular-capture-btn svg {
+      margin-bottom: 2px;
+    }
+
+    .circular-capture-btn span {
+      line-height: 1;
+    }
+
+    /* Instructions styling */
+    .instructions-container {
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(10px);
+      border-radius: 12px;
+      padding: 1.5rem;
+      max-width: 320px;
+      margin: 0 auto;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      text-align: center;
+    }
+    
+    /* NEW: Upload button styles */
+    .upload-button-container {
+      position: fixed;
+      top: 70%; /* Position below the capture button */
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    .upload-btn {
+      background: rgba(255, 255, 255, 0.9);
+      color: black;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 50px;
+      font-weight: 600;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .upload-btn:hover {
+      background: white;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    }
+    
+    .upload-btn:active {
+      transform: translateY(0);
+    }
+    
+    /* Hidden file input */
+    #fileInput {
+      display: none;
+    }
+    
+    /* Upload preview styling */
+    .upload-preview {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: black;
+      z-index: 20;
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    
+    .preview-image {
+      max-width: 90%;
+      max-height: 70%;
+      object-fit: contain;
+      border-radius: 12px;
+      margin-bottom: 20px;
+    }
+    
+    .preview-controls {
+      display: flex;
+      gap: 15px;
+    }
+    
+    .preview-btn {
+      padding: 12px 24px;
+      border-radius: 50px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      border: none;
+    }
+    
+    .confirm-btn {
+      background: #10b981;
+      color: white;
+    }
+    
+    .cancel-btn {
+      background: #ef4444;
+      color: white;
+    }
+    
+    .preview-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+  </style>
+</head>
+<body class="bg-black">
+  <!-- Camera Container with 9:16 Aspect Ratio -->
+  <div class="camera-container">
+    <div class="video-wrapper">
+      <div id="countdownOverlay" class="absolute top-1/4 left-0 w-full flex items-center justify-center text-white text-8xl font-bold z-30 hidden"></div>
+      <video id="video" autoplay playsinline></video>
+      <canvas id="canvas" class="hidden"></canvas>
+      
+      <!-- Simple 3x3 Grid Overlay -->
+      <div class="positioning-guide">
+        <div class="grid-overlay">
+          <div class="grid-cell"></div>
+          <div class="grid-cell"></div>
+          <div class="grid-cell"></div>
+          <div class="grid-cell"></div>
+          <div class="grid-cell"></div>
+          <div class="grid-cell"></div>
+          <div class="grid-cell"></div>
+          <div class="grid-cell"></div>
+          <div class="grid-cell"></div>
+        </div>
+      </div>
+   
+      
+      <!-- Capture indicator -->
+      <div id="captureIndicator" class="capture-indicator"></div>
+    </div>
+  </div>
+
+  <!-- Black bars for areas outside 9:16 -->
+  <div class="black-bars" id="blackBars"></div>
+
+  <!-- Floating UI Elements -->
+  <div class="floating-ui top-0 left-0 w-full p-4">
+    <!-- Header -->
+    <div class="flex justify-between items-center">
+     <div class="flex items-center">
+  <img src="logo.png" alt="Holord" class="holord-logo">
+</div>
+    </div>
+  </div>
+
+  <!-- Instructions Section - REPLACED Upload Section -->
+  <div class="floating-ui top-16 left-0 w-full px-4">
+    <div class="instructions-container">
+      <h2 class="text-white font-semibold text-center mb-3 text-lg">Ready to Try On Outfits?</h2>
+      <p class="text-white/80 text-sm text-center mb-2">Position yourself in the frame and capture your photo</p>
+      <!-- <div class="text-white/60 text-xs text-center space-y-1">
+        <p>• Stand in good lighting</p>
+        <p>• Face the camera directly</p>
+        <p>• Align within the grid lines</p>
+        <p>• Tap the capture button below</p>
+      </div> -->
+    </div>
+  </div>
+
+  <!-- NEW: Circular Capture Button in the Middle -->
+  <div class="capture-button-container">
+    <button id="captureBtn" class="circular-capture-btn">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+      <span>Capture</span>
+    </button>
+  </div>
+
+  <!-- NEW: Upload Button Below Capture Button -->
+  <div class="upload-button-container">
+    <button id="uploadBtn" class="upload-btn">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+      </svg>
+      Upload Photo Instead
+    </button>
+    <input type="file" id="fileInput" accept="image/*">
+  </div>
+
+  <!-- NEW: Upload Preview Modal -->
+  <div id="uploadPreview" class="upload-preview">
+    <img id="previewImage" class="preview-image" alt="Preview">
+    <div class="preview-controls">
+      <button id="confirmUpload" class="preview-btn confirm-btn">Use This Photo</button>
+      <button id="cancelUpload" class="preview-btn cancel-btn">Choose Another</button>
+    </div>
+  </div>
+
+  <!-- Floating Controls at Bottom -->
+  <div class="floating-ui bottom-0 left-0 w-full p-6">
+    <div class="flex flex-col items-center">
+      <!-- Camera Controls -->
+      <div class="flex space-x-4">
+        <button id="flipCamera" class="bg-black/30 backdrop-blur-sm text-white p-3 rounded-full">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("canvas");
+    const captureBtn = document.getElementById("captureBtn");
+    const flipCameraBtn = document.getElementById("flipCamera");
+    const captureIndicator = document.getElementById("captureIndicator");
+    const blackBars = document.getElementById("blackBars");
+    
+    // NEW: Upload elements
+    const uploadBtn = document.getElementById("uploadBtn");
+    const fileInput = document.getElementById("fileInput");
+    const uploadPreview = document.getElementById("uploadPreview");
+    const previewImage = document.getElementById("previewImage");
+    const confirmUpload = document.getElementById("confirmUpload");
+    const cancelUpload = document.getElementById("cancelUpload");
+    
+    let availableCameras = [];
+    let currentCameraIndex = 0;
+    let stream = null;
+
+    // Update black bars based on screen size for 9:16 aspect ratio
+    function updateBlackBars() {
+      const videoWrapper = document.querySelector('.video-wrapper');
+      const wrapperRect = videoWrapper.getBoundingClientRect();
+      
+      // Clear previous black bars
+      blackBars.innerHTML = '';
+      
+      // Calculate black bar dimensions for 9:16 aspect ratio (portrait)
+      const windowHeight = window.innerHeight;
+      const windowWidth = window.innerWidth;
+      const videoHeight = wrapperRect.height;
+      const videoWidth = wrapperRect.width;
+      
+      // For 9:16 aspect ratio, we need horizontal black bars on the sides
+      const leftBarWidth = Math.max(0, (windowWidth - videoWidth) / 2);
+      const rightBarWidth = Math.max(0, (windowWidth - videoWidth) / 2);
+      
+      // Create left black bar
+      if (leftBarWidth > 0) {
+        const leftBar = document.createElement('div');
+        leftBar.className = 'black-bar-left';
+        leftBar.style.width = leftBarWidth + 'px';
+        blackBars.appendChild(leftBar);
+      }
+      
+      // Create right black bar
+      if (rightBarWidth > 0) {
+        const rightBar = document.createElement('div');
+        rightBar.className = 'black-bar-right';
+        rightBar.style.width = rightBarWidth + 'px';
+        blackBars.appendChild(rightBar);
+      }
+    }
+
+    // Get all available cameras
+    async function getAvailableCameras() {
+      try {
+        await navigator.mediaDevices.getUserMedia({ video: true });
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        console.log("Devices:", devices);
+        availableCameras = devices.filter(device => device.kind === 'videoinput');
+        console.log('Available cameras:', availableCameras.map(cam => cam.label || cam.deviceId));
+      } catch (err) {
+        console.error("Error getting cameras:", err);
+        availableCameras = [];
+      }
+    }
+
+    // Access webcam with 9:16 aspect ratio (portrait)
+    async function initializeCamera(deviceId = null) {
+      const constraints = {
+        video: { 
+          width: { ideal: 720 },   // 9:16 width (9 parts)
+          height: { ideal: 1280 }, // 9:16 height (16 parts)
+          aspectRatio: 9/16        // Force 9:16 aspect ratio (portrait)
+        }
+      };
+
+      // If specific device ID is provided, use it
+      if (deviceId) {
+        constraints.video.deviceId = { exact: deviceId };
+      }
+      
+      try {
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+        }
+        
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = stream;
+        
+        // Update black bars after video loads
+        video.onloadedmetadata = () => {
+          updateBlackBars();
+        };
+        
+      } catch (err) {
+        console.error("Error accessing camera with 9:16:", err);
+        
+        // Fallback to any aspect ratio
+        try {
+          const fallbackConstraints = { 
+            video: true 
+          };
+          if (deviceId) {
+            fallbackConstraints.video.deviceId = { exact: deviceId };
+          }
+          stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+          video.srcObject = stream;
+          
+          video.onloadedmetadata = () => {
+            updateBlackBars();
+          };
+        } catch (fallbackErr) {
+          alert("Camera access failed: " + fallbackErr.message);
+        }
+      }
+    }
+
+    // Initialize cameras
+    async function init() {
+      await getAvailableCameras();
+      initializeCamera();
+      
+      // Update black bars on resize
+      window.addEventListener('resize', updateBlackBars);
+      
+      // NEW: Set up upload event listeners
+      setupUploadEvents();
+    }
+    
+    init();
+
+    // NEW: Setup upload functionality
+    function setupUploadEvents() {
+      // Trigger file input when upload button is clicked
+      uploadBtn.addEventListener('click', () => {
+        fileInput.click();
+      });
+      
+      // Handle file selection
+      fileInput.addEventListener('change', handleFileSelect);
+      
+      // Handle preview confirm/cancel
+      confirmUpload.addEventListener('click', useUploadedPhoto);
+      cancelUpload.addEventListener('click', () => {
+        uploadPreview.style.display = 'none';
+        fileInput.value = ''; // Reset file input
+      });
+    }
+    
+    // NEW: Handle file selection and show preview
+    function handleFileSelect(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      
+      // Check if file is an image
+      if (!file.type.match('image.*')) {
+        alert('Please select an image file (JPEG, PNG, etc.)');
+        return;
+      }
+      
+      // Create a FileReader to read the image
+      const reader = new FileReader();
+      
+      reader.onload = function(e) {
+        // Show the preview
+        previewImage.src = e.target.result;
+        uploadPreview.style.display = 'flex';
+      };
+      
+      reader.readAsDataURL(file);
+    }
+    
+    // NEW: Use the uploaded photo
+    function useUploadedPhoto() {
+      // Save the image data to localStorage
+      localStorage.setItem("userPhoto", previewImage.src);
+      
+      // Show processing state
+      uploadPreview.style.display = 'none';
+      uploadBtn.innerHTML = '<span class="pulse">Processing...</span>';
+      uploadBtn.disabled = true;
+      
+      // Navigate to outfit page
+      setTimeout(() => {
+        window.location.href = "outfit.html";
+      }, 1000);
+    }
+
+    // Cycle through cameras
+    flipCameraBtn.addEventListener("click", () => {
+      if (availableCameras.length > 1) {
+        currentCameraIndex = (currentCameraIndex + 1) % availableCameras.length;
+        const selectedCamera = availableCameras[currentCameraIndex];
+        console.log('Switching to camera:', selectedCamera.label || selectedCamera.deviceId);
+        initializeCamera(selectedCamera.deviceId);
+
+        console.log("Index:", currentCameraIndex, "ID:", selectedCamera.deviceId);
+
+        // Save to localStorage
+        localStorage.setItem("lastUsedCameraID", selectedCamera.deviceId);
+        localStorage.setItem("lastUsedCameraIndex", currentCameraIndex);
+      }
+    });
+
+    // Capture photo
+    captureBtn.addEventListener("click", () => {
+      let countdown = 3;
+
+      function showCountdown(num) {
+        captureBtn.innerHTML = `<span class="countdown-fade" style="font-size:2rem; font-weight:bold;">${num}</span>`;
+      }
+
+      showCountdown(countdown);
+      captureBtn.disabled = true;
+
+      const countdownInterval = setInterval(() => {
+        countdown--;
+        if (countdown > 0) {
+          showCountdown(countdown);
+        } else {
+          clearInterval(countdownInterval);
+
+          // Capture photo
+          capturePhoto();
+
+          // Reset button back
+          setTimeout(() => {
+            captureBtn.innerHTML = `
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <span>Capture</span>
+            `;
+            captureBtn.disabled = false;
+          }, 500);
+        }
+      }, 1000);
+    });
+
+    function capturePhoto() {
+      setTimeout(() => {
+        // Capture image with 9:16 aspect ratio
+        const context = canvas.getContext("2d");
+        
+        // Set canvas to 9:16 aspect ratio (portrait)
+        const targetWidth = 720;   // 9 parts
+        const targetHeight = 1280; // 16 parts
+        
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+        
+        // Draw video frame to canvas, maintaining 9:16
+        context.drawImage(video, 0, 0, targetWidth, targetHeight);
+        
+        // Save to localStorage
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.9); // JPEG with quality
+        localStorage.setItem("userPhoto", dataUrl);
+        
+        // Hide indicator
+        captureIndicator.classList.remove("pulse");
+        captureIndicator.style.opacity = "0";
+        
+        // Update button text to show processing
+        captureBtn.innerHTML = '<span class="pulse">Processing...</span>';
+        captureBtn.disabled = true;
+        
+        setTimeout(() => {
+          window.location.href = "outfit.html";
+        }, 1000);
+      }, 500);
+    }
+
+    // Handle page visibility
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden && !stream?.active) {
+        const lastCameraID = localStorage.getItem("lastUsedCameraID");
+        if (lastCameraID) {
+          initializeCamera(lastCameraID);
+        } else {
+          initializeCamera();
+        }
+      }
+    });
+
+    // Initial black bars setup
+    setTimeout(updateBlackBars, 100);
+  </script>
+</body>
+</html>
