@@ -2045,91 +2045,99 @@
         return true;
     }
 
-    // ⚡ DIRECT IMAGE DISPLAY - No CDN logic
-    async function generateTryOn() {
-        const submitBtn = document.getElementById("submitBtn");
-        const loadingOverlay = document.getElementById("loadingOverlay");
-        const debugInfo = document.getElementById("debugInfo");
+// ⚡ DIRECT IMAGE DISPLAY - No CDN logic
+async function generateTryOn() {
+    const submitBtn = document.getElementById("submitBtn");
+    const loadingOverlay = document.getElementById("loadingOverlay");
+    const debugInfo = document.getElementById("debugInfo");
 
-        if (!validateInputs()) {
-            return;
-        }
-
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<span class="pulse">Generating... (60 seconds mafx)</span>';
-        loadingOverlay.classList.remove("hidden");
-        
-        // 60 second timeout for slow backend
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000);
-        
-        try {
-            debugInfo.innerHTML = "Starting image processing...";
-            
-            const formData = await prepareFormData();
-            if (!formData) {
-                throw new Error("Failed to prepare form data");
-            }
-
-            debugInfo.innerHTML = "";
-            console.log("Sending request to backend...");
-
-            const response = await fetch("http://localhost:5000/generate", {
-                method: "POST",
-                body: formData,
-                signal: controller.signal
-            });
-
-            clearTimeout(timeoutId);
-
-            if (!response.ok) {
-                throw new Error(`Server error: ${response.status}`);
-            }
-
-            const result = await response.json();
-
-            if (result.success) {
-                // ⚡ DIRECT DISPLAY - No CDN, just use the image data directly
-                const modal = document.getElementById("resultModal");
-                const fullscreenImage = document.getElementById("generatedImageFullscreen");
-                
-                if (result.resultImageUrl) {
-                    // If it's a URL, use it directly
-                    fullscreenImage.src = result.resultImageUrl;
-                } else if (result.image_data) {
-                    // If it's base64 data, use it directly
-                    fullscreenImage.src = result.image_data;
-                } else {
-                    throw new Error("No image data in response");
-                }
-                
-                // Show modal immediately
-                loadingOverlay.classList.add("hidden");
-                modal.classList.remove("hidden");
-                
-                debugInfo.innerHTML = "Success! Image loaded directly from backend.";
-                
-            } else {
-                throw new Error(result.error || "Failed to generate image");
-            }
-        } catch (error) {
-            console.error("Error:", error);
-            
-            if (error.name === 'AbortError') {
-                debugInfo.innerHTML = "Timeout - Backend is very slow";
-                alert("🕒 AI processing is taking too long. The backend might be overloaded or the image is too large.");
-            } else {
-                debugInfo.innerHTML = "Error: " + error.message;
-                alert("❌ Error: " + error.message);
-            }
-            
-            loadingOverlay.classList.add("hidden");
-        } finally {
-            clearTimeout(timeoutId);
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>Generate Your Outfit';
-        }
+    if (!validateInputs()) {
+        return;
     }
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="pulse">Generating... (30 seconds)</span>';
+    loadingOverlay.classList.remove("hidden");
+    
+    // 60 second timeout for slow backend
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
+    
+    try {
+        debugInfo.innerHTML = "Starting image processing...";
+        
+        const formData = await prepareFormData();
+        if (!formData) {
+            throw new Error("Failed to prepare form data");
+        }
+
+        debugInfo.innerHTML = "";
+        console.log("Sending request to backend...");
+
+        // ⚡⚡⚡ IMPORTANT: Changed from localhost to Render URL ⚡⚡⚡
+        const API_URL = "https://holord-backend.onrender.com";
+        const response = await fetch(`${API_URL}/generate`, {
+            method: "POST",
+            body: formData,
+            signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error("Server response:", errorText);
+            throw new Error(`Server error: ${response.status} - ${errorText}`);
+        }
+
+        const result = await response.json();
+        console.log("Backend response:", result);
+
+        if (result.success) {
+            // ⚡ DIRECT DISPLAY - No CDN, just use the image data directly
+            const modal = document.getElementById("resultModal");
+            const fullscreenImage = document.getElementById("generatedImageFullscreen");
+            
+            if (result.resultImageUrl) {
+                // If it's a URL, use it directly
+                fullscreenImage.src = result.resultImageUrl;
+                console.log("✅ Image URL from backend:", result.resultImageUrl);
+            } else if (result.image_data) {
+                // If it's base64 data, use it directly
+                fullscreenImage.src = result.image_data;
+                console.log("✅ Image data received (base64)");
+            } else {
+                console.error("No image data in response:", result);
+                throw new Error("No image data in response");
+            }
+            
+            // Show modal immediately
+            loadingOverlay.classList.add("hidden");
+            modal.classList.remove("hidden");
+            
+            debugInfo.innerHTML = "Success! Image loaded from backend.";
+            
+        } else {
+            throw new Error(result.error || "Failed to generate image");
+        }
+    } catch (error) {
+        console.error("Error:", error);
+        
+        if (error.name === 'AbortError') {
+            debugInfo.innerHTML = "Timeout - Backend is very slow";
+            alert("🕒 AI processing is taking too long. The backend might be overloaded or the image is too large.");
+        } else {
+            debugInfo.innerHTML = "Error: " + error.message;
+            alert("❌ Error: " + error.message);
+        }
+        
+        loadingOverlay.classList.add("hidden");
+    } finally {
+        clearTimeout(timeoutId);
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>Generate Your Outfit';
+    }
+}
 
     // Initialize the app when DOM is loaded
     document.addEventListener('DOMContentLoaded', initializeApp);
