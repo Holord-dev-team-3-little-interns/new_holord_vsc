@@ -1344,29 +1344,39 @@
     ];
 
     // NEW: Themes array with complete outfits - ARABIC THOBE ADDED
-    const themes = [
-        {
-            id: 'arabic_thobe',
-            name: "Arabic Thobe",
-            description: "Traditional Arabic thobe with headwear",
-            image: "themes/arabic_thobe_preview.jpg",
-            items: [
-                { name: "Arabic Thobe", type: "top", clothingFile: "arabic_thobe.png" }
-            ]
-        },
-        {
-            id: 'f1',
-            name: "F1 Racing Theme",
-            description: "Complete racing-inspired outfit",
-            image: "themes/f1_theme.jpg",
-            items: [
-                { name: "Racing Jacket", type: "top", clothingFile: "f1_jacket.png" },
-                { name: "Racing Pants", type: "bottom", clothingFile: "f1_pants.png" },
-                { name: "Racing Shoes", type: "footwear", footwearType: "athletic_shoes", footwearFile: "footwear/athletic_shoes.png" }
-            ]
-        }
-    ];
-
+ const themes = [
+    {
+        id: 'arabic_thobe',
+        name: "Arabic Thobe",
+        description: "Traditional Arabic thobe with headwear",
+        image: "https://placehold.co/300x200/8b5cf6/ffffff?text=Arabic+Thobe",
+        items: [
+            { 
+                name: "Arabic Thobe", 
+                type: "top", 
+                clothingFile: "arabic_thobe.png"  // ✅ CORRECT
+            }
+        ]
+    },
+    {
+        id: 'f1',
+        name: "F1 Racing Theme",
+        description: "Complete racing-inspired outfit",
+        image: "https://placehold.co/300x200/3b82f6/ffffff?text=F1+Racing",
+        items: [
+            { 
+                name: "Racing Jacket", 
+                type: "top", 
+                clothingFile: "f1_jacket.png"  // ✅ CORRECT
+            },
+            { 
+                name: "Racing Pants", 
+                type: "bottom", 
+                clothingFile: "f1_pants.png"  // ✅ CORRECT
+            }
+        ]
+    }
+];
     // Initialize the application
     function initializeApp() {
         // Check for photo from capture.html
