@@ -78,51 +78,56 @@
         }
         
         // Simple login function
-        async function login() {
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            
-            if (!email || !password) {
-                alert('Please fill in all fields');
-                return;
-            }
-            
-            // For now, just store in localStorage (no backend)
-            const user = {
-                email: email,
-                name: email.split('@')[0],
-                createdAt: new Date().toISOString()
-            };
-            
-            localStorage.setItem('holord_user', JSON.stringify(user));
-            
-            // Redirect to capture page
-            window.location.href = 'capture.html';
-        }
+   async function login() {
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+
+  if (!email || !password) {
+    alert("Please fill in all fields");
+    return;
+  }
+
+  try {
+    const res = await fetch("https://holord-backend.onrender.com/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data.message);
+      return;
+    }
+
+    // Store token securely
+    localStorage.setItem("holord_token", data.token);
+    localStorage.setItem("holord_user", JSON.stringify(data.user));
+
+    window.location.href = "capture.html";
+
+  } catch (err) {
+    alert("Server error. Try again later.");
+  }
+}
         
         // Signup (same as login for now)
-        function signup() {
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            
-            if (!email || !password) {
-                alert('Please fill in all fields');
-                return;
-            }
-            
-            // For demo, signup is same as login
-            const user = {
-                email: email,
-                name: email.split('@')[0],
-                createdAt: new Date().toISOString(),
-                isNewUser: true
-            };
-            
-            localStorage.setItem('holord_user', JSON.stringify(user));
-            
-            // Redirect to capture page
-            window.location.href = 'capture.html';
-        }
+      async function signup() {
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+
+  const res = await fetch("https://holord-backend.onrender.com/api/auth/signup", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password })
+  });
+
+  const data = await res.json();
+  if (!res.ok) return alert(data.message);
+
+  alert("Account created! Please log in.");
+}
         
         // Enter key to login
         document.addEventListener('keypress', function(e) {
