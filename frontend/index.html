@@ -78,7 +78,7 @@
         }
         
         // Simple login function
-   async function login() {
+async function login() {
   const email = document.getElementById("email").value;
   const password = document.getElementById("password").value;
 
@@ -88,16 +88,34 @@
   }
 
   try {
+    console.log("Attempting login with:", { email });
+    
     const res = await fetch("https://holord-backend.onrender.com/api/auth/login", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password })
+      headers: { 
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      },
+      body: JSON.stringify({ email, password }),
+      mode: "cors"
     });
 
-    const data = await res.json();
+    console.log("Response status:", res.status);
+    
+    const text = await res.text();
+    console.log("Raw response:", text);
+    
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      console.error("Failed to parse JSON:", text);
+      alert("Server returned invalid response");
+      return;
+    }
 
     if (!res.ok) {
-      alert(data.message);
+      alert(data.message || "Login failed");
       return;
     }
 
@@ -105,10 +123,12 @@
     localStorage.setItem("holord_token", data.token);
     localStorage.setItem("holord_user", JSON.stringify(data.user));
 
+    console.log("Login successful, redirecting...");
     window.location.href = "capture.html";
 
   } catch (err) {
-    alert("Server error. Try again later.");
+    console.error("Login error:", err);
+    alert("Server error. Try again later. Check console for details.");
   }
 }
         
