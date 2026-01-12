@@ -24,21 +24,26 @@
         .logo {
             height: 60px;
             margin-bottom: 1.5rem;
-            filter: brightness(0) invert(1);
+        }
+        
+        /* Hide/show elements */
+        .hidden {
+            display: none !important;
         }
     </style>
 </head>
 <body class="flex items-center justify-center p-4">
-    <div class="login-card">
+    <!-- Login/Signup Card -->
+    <div id="authCard" class="login-card">
         <!-- Logo -->
         <div class="text-center mb-8">
             <img src="logo.png" alt="Holord" class="logo inline-block">
-            <h1 class="text-2xl font-bold text-gray-800 mt-2">Welcome Back</h1>
+            <h1 class="text-2xl font-bold text-gray-800 mt-2">Welcome to Holord</h1>
             <p class="text-gray-600">Sign in to your account</p>
         </div>
         
         <!-- Login Form -->
-        <div class="space-y-4">
+        <div id="loginForm" class="space-y-4">
             <div>
                 <label class="block text-gray-700 mb-2">Email</label>
                 <input type="email" id="email" 
@@ -66,95 +71,182 @@
             </button>
         </div>
         
+        <!-- Loading Spinner -->
+        <div id="loadingSpinner" class="hidden text-center py-4">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <p class="text-gray-600 mt-2">Please wait...</p>
+        </div>
+        
         <div class="mt-6 text-center text-sm text-gray-500">
             <p>By continuing, you agree to our Terms & Privacy</p>
+        </div>
+    </div>
+    
+    <!-- Homepage (Shown after login) -->
+    <div id="homepage" class="hidden text-center p-8 max-w-xl">
+        <img src="logo4.png" alt="Holord Logo" class="mx-auto w-32" />
+        <h1 class="text-5xl font-extrabold mb-4 text-[#203d81]">
+            Welcome to Holord
+        </h1>
+        <p class="text-lg text-[#1860ac]/90 mb-8">
+            Step into holographic fashion. Try outfits instantly with
+            AI-powered hologram simulation.
+        </p>
+        <button onclick="goToCapture()" 
+                class="bg-[#203d81] text-white font-semibold px-8 py-3 rounded-lg shadow-lg hover:bg-[#1860ac] transition-all">
+            Start Experience
+        </button>
+        
+        <div class="mt-8 p-4 bg-blue-50 rounded-lg">
+            <p class="text-gray-700 mb-2">Logged in as: <span id="userEmail" class="font-semibold"></span></p>
+            <button onclick="logout()" 
+                    class="text-sm text-red-600 hover:text-red-800">
+                Logout
+            </button>
         </div>
     </div>
 
     <script>
         // Check if already logged in
-        if (localStorage.getItem('holord_user')) {
-            window.location.href = 'capture.html';
+        const user = localStorage.getItem('holord_user');
+        if (user) {
+            showHomepage();
         }
         
-        // Simple login function
-async function login() {
-  const email = document.getElementById("email").value;
-  const password = document.getElementById("password").value;
-
-  if (!email || !password) {
-    alert("Please fill in all fields");
-    return;
-  }
-
-  try {
-    console.log("Attempting login with:", { email });
-    
-    const res = await fetch("https://holord-backend.onrender.com/api/auth/login", {
-      method: "POST",
-      headers: { 
-        "Content-Type": "application/json",
-        "Accept": "application/json"
-      },
-      body: JSON.stringify({ email, password }),
-      mode: "cors"
-    });
-
-    console.log("Response status:", res.status);
-    
-    const text = await res.text();
-    console.log("Raw response:", text);
-    
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch (e) {
-      console.error("Failed to parse JSON:", text);
-      alert("Server returned invalid response");
-      return;
-    }
-
-    if (!res.ok) {
-      alert(data.message || "Login failed");
-      return;
-    }
-
-    // Store token securely
-    localStorage.setItem("holord_token", data.token);
-    localStorage.setItem("holord_user", JSON.stringify(data.user));
-
-    console.log("Login successful, redirecting...");
-    window.location.href = "capture.html";
-
-  } catch (err) {
-    console.error("Login error:", err);
-    alert("Server error. Try again later. Check console for details.");
-  }
-}
+        function showLoading(show) {
+            document.getElementById('loadingSpinner').classList.toggle('hidden', !show);
+            document.getElementById('loginForm').classList.toggle('hidden', show);
+        }
         
-        // Signup (same as login for now)
-      async function signup() {
-  const email = document.getElementById("email").value;
-  const password = document.getElementById("password").value;
+        function showHomepage() {
+            const user = JSON.parse(localStorage.getItem('holord_user') || '{}');
+            document.getElementById('userEmail').textContent = user.email || 'User';
+            document.getElementById('authCard').classList.add('hidden');
+            document.getElementById('homepage').classList.remove('hidden');
+            
+            // Change background to match homepage style
+            document.body.style.background = 'linear-gradient(to bottom, white, #e3f0ff)';
+            document.body.className = 'bg-gradient-to-b from-white to-[#e3f0ff] text-[#203d81] min-h-screen flex items-center justify-center';
+        }
+        
+        function showLogin() {
+            document.getElementById('authCard').classList.remove('hidden');
+            document.getElementById('homepage').classList.add('hidden');
+            
+            // Change background back to login style
+            document.body.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+            document.body.className = 'flex items-center justify-center p-4';
+        }
+        
+        async function login() {
+            const email = document.getElementById("email").value;
+            const password = document.getElementById("password").value;
 
-  const res = await fetch("https://holord-backend.onrender.com/api/auth/signup", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password })
-  });
+            if (!email || !password) {
+                alert("Please fill in all fields");
+                return;
+            }
 
-  const data = await res.json();
-  if (!res.ok) return alert(data.message);
+            try {
+                showLoading(true);
+                console.log("Attempting login with:", { email });
+                
+                const res = await fetch("https://holord-backend.onrender.com/api/auth/login", {
+                    method: "POST",
+                    headers: { 
+                        "Content-Type": "application/json",
+                        "Accept": "application/json"
+                    },
+                    body: JSON.stringify({ email, password })
+                });
 
-  alert("Account created! Please log in.");
-}
+                const data = await res.json();
+
+                if (!res.ok) {
+                    showLoading(false);
+                    // If user doesn't exist, ask to sign up
+                    if (data.message === "Invalid email or password") {
+                        const shouldSignup = confirm("User not found. Would you like to create an account?");
+                        if (shouldSignup) {
+                            await signup();
+                        }
+                    } else {
+                        alert(data.message || "Login failed");
+                    }
+                    return;
+                }
+
+                // Store token and user
+                localStorage.setItem("holord_token", data.token);
+                localStorage.setItem("holord_user", JSON.stringify(data.user));
+
+                console.log("Login successful!");
+                showHomepage();
+
+            } catch (err) {
+                showLoading(false);
+                console.error("Login error:", err);
+                alert("Server error. Try again later.");
+            }
+        }
+        
+        async function signup() {
+            const email = document.getElementById("email").value;
+            const password = document.getElementById("password").value;
+
+            if (!email || !password) {
+                alert("Please fill in all fields");
+                return;
+            }
+
+            try {
+                showLoading(true);
+                const res = await fetch("https://holord-backend.onrender.com/api/auth/signup", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await res.json();
+                showLoading(false);
+                
+                if (!res.ok) {
+                    alert(data.message || "Signup failed");
+                    return;
+                }
+
+                alert("Account created! Please log in.");
+                // Auto-fill email for login
+                document.getElementById("email").value = email;
+                document.getElementById("password").value = "";
+                document.getElementById("password").focus();
+
+            } catch (err) {
+                showLoading(false);
+                console.error("Signup error:", err);
+                alert("Server error. Try again later.");
+            }
+        }
+        
+        function goToCapture() {
+            window.location.href = "capture.html";
+        }
+        
+        function logout() {
+            localStorage.removeItem('holord_token');
+            localStorage.removeItem('holord_user');
+            showLogin();
+        }
         
         // Enter key to login
         document.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' && !document.getElementById('homepage').classList.contains('hidden')) {
                 login();
             }
         });
+        
+        // Auto-focus email field
+        document.getElementById('email').focus();
     </script>
 </body>
 </html>
