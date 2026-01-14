@@ -65,7 +65,7 @@
             
             <div class="text-center text-gray-600 my-4">or</div>
             
-            <button onclick="signup()" 
+            <button onclick="showSignupMessage()" 
                     class="w-full border-2 border-blue-600 text-blue-600 hover:bg-blue-50 font-semibold py-3 rounded-lg transition">
                 Create New Account
             </button>
@@ -82,7 +82,7 @@
         </div>
     </div>
     
-    <!-- Homepage (Shown after login) - REMOVED the logout section -->
+    <!-- Homepage (Shown after login) -->
     <div id="homepage" class="hidden text-center p-8 max-w-xl">
         <img src="logo4.png" alt="Holord Logo" class="mx-auto w-32" />
         <h1 class="text-5xl font-extrabold mb-4 text-[#203d81]">
@@ -93,18 +93,35 @@
             AI-powered hologram simulation.
         </p>
         <button onclick="goToCapture()" 
-                class="bg-[#203d81] text-white font-semibold px-8 py-3 rounded-lg shadow-lg hover:bg-[#1860ac] transition-all">
+                class="bg-[#203d81] text-white font-semibold px-8 py-3 rounded-lg shadow-lg hover:bg-[#1860ac] transition-all mb-6">
             Start Experience
         </button>
-        <!-- Removed the logout section completely -->
+        
+        <!-- ADDED BACK: Logout button -->
+        <div class="mt-4 pt-4 border-t border-gray-200">
+            <p class="text-sm text-gray-600 mb-2">Logged in as: <span id="loggedInEmail" class="font-medium"></span></p>
+            <button onclick="logout()" 
+                    class="text-sm text-red-600 hover:text-red-800 hover:underline">
+                Logout
+            </button>
+        </div>
     </div>
 
     <script>
-        // Check if already logged in
-        const user = localStorage.getItem('holord_user');
-        if (user) {
-            showHomepage();
+        // ========== IMPORTANT CHANGE: REMOVED AUTO-LOGIN ==========
+        // NO auto-login - user must enter credentials every time
+        // Comment: We're intentionally NOT auto-logging users in
+        
+        // Optional: Clear any old credentials on page load
+        function clearOldCredentials() {
+            // You can uncomment these lines if you want to force clear on every page load
+            // localStorage.removeItem('holord_token');
+            // localStorage.removeItem('holord_user');
+            console.log("Page loaded - user must login manually");
         }
+        
+        // Call on page load
+        clearOldCredentials();
         
         function showLoading(show) {
             document.getElementById('loadingSpinner').classList.toggle('hidden', !show);
@@ -112,6 +129,10 @@
         }
         
         function showHomepage() {
+            // Get user email to display
+            const userData = JSON.parse(localStorage.getItem('holord_user') || '{}');
+            document.getElementById('loggedInEmail').textContent = userData.email || 'User';
+            
             document.getElementById('authCard').classList.add('hidden');
             document.getElementById('homepage').classList.remove('hidden');
             
@@ -127,6 +148,11 @@
             // Change background back to login style
             document.body.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
             document.body.className = 'flex items-center justify-center p-4';
+            
+            // Clear form fields
+            document.getElementById('email').value = '';
+            document.getElementById('password').value = '';
+            document.getElementById('email').focus();
         }
         
         async function login() {
@@ -155,12 +181,9 @@
 
                 if (!res.ok) {
                     showLoading(false);
-                    // If user doesn't exist, ask to sign up
-                    if (data.message === "Invalid email or password") {
-                        const shouldSignup = confirm("User not found. Would you like to create an account?");
-                        if (shouldSignup) {
-                            await signup();
-                        }
+                    // With new backend, signup is disabled - show appropriate message
+                    if (data.message && data.message.includes("Account not found")) {
+                        alert("Account not found. Please contact support@holord.com for access.");
                     } else {
                         alert(data.message || "Login failed");
                     }
@@ -181,42 +204,14 @@
             }
         }
         
-        async function signup() {
-            const email = document.getElementById("email").value;
-            const password = document.getElementById("password").value;
-
-            if (!email || !password) {
-                alert("Please fill in all fields");
-                return;
-            }
-
-            try {
-                showLoading(true);
-                const res = await fetch("https://holord-backend.onrender.com/api/auth/signup", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ email, password })
-                });
-
-                const data = await res.json();
-                showLoading(false);
-                
-                if (!res.ok) {
-                    alert(data.message || "Signup failed");
-                    return;
-                }
-
-                alert("Account created! Please log in.");
-                // Auto-fill email for login
-                document.getElementById("email").value = email;
-                document.getElementById("password").value = "";
-                document.getElementById("password").focus();
-
-            } catch (err) {
-                showLoading(false);
-                console.error("Signup error:", err);
-                alert("Server error. Try again later.");
-            }
+        // Updated signup function - accounts are now invitation-only
+        function showSignupMessage() {
+            alert("Account creation is by invitation only.\n\nPlease contact support@holord.com for access.");
+            
+            // Optional: Clear form
+            document.getElementById('email').value = '';
+            document.getElementById('password').value = '';
+            document.getElementById('email').focus();
         }
         
         function goToCapture() {
@@ -224,20 +219,57 @@
         }
         
         function logout() {
+            // Clear ALL authentication data
             localStorage.removeItem('holord_token');
             localStorage.removeItem('holord_user');
+            
+            // Optional: Clear session storage too
+            sessionStorage.clear();
+            
+            console.log("User logged out successfully");
+            
+            // Show login page
             showLogin();
+            
+            // Optional: Show confirmation message
+            // alert("You have been logged out successfully.");
         }
         
-        // Enter key to login
+        // Enter key to login (only when on login page)
         document.addEventListener('keypress', function(e) {
             if (e.key === 'Enter' && !document.getElementById('homepage').classList.contains('hidden')) {
                 login();
             }
         });
         
-        // Auto-focus email field
+        // Auto-focus email field on page load
         document.getElementById('email').focus();
+        
+        // Optional: Add token expiry check
+        function checkTokenExpiry() {
+            const token = localStorage.getItem('holord_token');
+            if (!token) return true;
+            
+            try {
+                // Simple JWT expiry check (without verification)
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                const expiryTime = payload.exp * 1000; // Convert to milliseconds
+                const currentTime = Date.now();
+                
+                if (expiryTime < currentTime) {
+                    console.log("Token expired, forcing logout");
+                    logout();
+                    return true;
+                }
+                return false;
+            } catch (error) {
+                console.log("Invalid token format");
+                return true;
+            }
+        }
+        
+        // Check token on page load (optional)
+        // checkTokenExpiry();
     </script>
 </body>
 </html>
